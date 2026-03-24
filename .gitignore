@@ -1,0 +1,3 @@
+*.local.md
+team-capacity/data/*
+!team-capacity/data/config.example.json
