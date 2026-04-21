@@ -79,24 +79,57 @@ function getPortugueseHolidayMap(year: number): Map<string, string> {
 }
 
 function getUSHolidayMap(year: number): Map<string, string> {
-  const mlk = nthWeekday(year, 0, 1, 3)       // 3rd Monday of January
-  const presidents = nthWeekday(year, 1, 1, 3) // 3rd Monday of February
-  const memorial = lastWeekday(year, 4, 1)      // Last Monday of May
-  const labor = nthWeekday(year, 8, 1, 1)       // 1st Monday of September
-  const columbus = nthWeekday(year, 9, 1, 2)    // 2nd Monday of October
-  const thanksgiving = nthWeekday(year, 10, 4, 4) // 4th Thursday of November
+  const presidents = nthWeekday(year, 1, 1, 3)    // 3rd Monday of February
+  const memorial = lastWeekday(year, 4, 1)          // Last Monday of May
+  const labor = nthWeekday(year, 8, 1, 1)           // 1st Monday of September
+  const thanksgiving = nthWeekday(year, 10, 4, 4)   // 4th Thursday of November
+  const dayAfterThanksgiving = addDays(thanksgiving, 1)
 
   return new Map<string, string>([
     [`${year}-01-01`, "New Year's Day"],
-    [toISO(mlk), 'Martin Luther King Jr. Day'],
     [toISO(presidents), "Presidents' Day"],
     [toISO(memorial), 'Memorial Day'],
+    [`${year}-06-19`, 'Juneteenth'],
     [`${year}-07-04`, 'Independence Day'],
     [toISO(labor), 'Labor Day'],
-    [toISO(columbus), 'Columbus Day'],
-    [`${year}-11-11`, 'Veterans Day'],
     [toISO(thanksgiving), 'Thanksgiving Day'],
+    [toISO(dayAfterThanksgiving), 'Day after Thanksgiving'],
     [`${year}-12-25`, 'Christmas Day'],
+  ])
+}
+
+function getUKHolidayMap(year: number): Map<string, string> {
+  const easter = computeEaster(year)
+  const earlyMay = nthWeekday(year, 4, 1, 1)    // 1st Monday of May
+  const springBH = lastWeekday(year, 4, 1)       // Last Monday of May
+  const summerBH = lastWeekday(year, 7, 1)       // Last Monday of August
+
+  return new Map<string, string>([
+    [`${year}-01-01`, "New Year's Day"],
+    [toISO(addDays(easter, -2)), 'Good Friday'],
+    [toISO(addDays(easter, 1)), 'Easter Monday'],
+    [toISO(earlyMay), 'Early May Bank Holiday'],
+    [toISO(springBH), 'Spring Bank Holiday'],
+    [toISO(summerBH), 'Summer Bank Holiday'],
+    [`${year}-12-25`, 'Christmas Day'],
+    [`${year}-12-26`, 'Boxing Day'],
+  ])
+}
+
+function getSpainHolidayMap(year: number): Map<string, string> {
+  const easter = computeEaster(year)
+
+  return new Map<string, string>([
+    [`${year}-01-01`, 'Año Nuevo'],
+    [`${year}-01-06`, 'Epifanía del Señor'],
+    [toISO(addDays(easter, -2)), 'Viernes Santo'],
+    [`${year}-05-01`, 'Fiesta del Trabajo'],
+    [`${year}-08-15`, 'Asunción de la Virgen'],
+    [`${year}-10-12`, 'Fiesta Nacional de España'],
+    [`${year}-11-01`, 'Todos los Santos'],
+    [`${year}-12-06`, 'Día de la Constitución Española'],
+    [`${year}-12-08`, 'Inmaculada Concepción'],
+    [`${year}-12-25`, 'Navidad'],
   ])
 }
 
@@ -144,6 +177,10 @@ export function getHolidaysInSprintForCountry(
       for (const h of (localHolidays ?? [])) allHolidays.set(`${y}-${h.date}`, h.name)
     } else if (country === 'US') {
       for (const [date, name] of getUSHolidayMap(y)) allHolidays.set(date, name)
+    } else if (country === 'UK') {
+      for (const [date, name] of getUKHolidayMap(y)) allHolidays.set(date, name)
+    } else if (country === 'ES') {
+      for (const [date, name] of getSpainHolidayMap(y)) allHolidays.set(date, name)
     }
     // Unknown country → no national holidays
   }

@@ -8,6 +8,8 @@ import type { MemberConfig, LocalHoliday } from '@/lib/data/config'
 
 const COUNTRIES = [
   { code: 'PT', label: '🇵🇹 Portugal' },
+  { code: 'UK', label: '🇬🇧 United Kingdom' },
+  { code: 'ES', label: '🇪🇸 Spain' },
   { code: 'US', label: '🇺🇸 United States' },
 ]
 
