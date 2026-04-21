@@ -16,6 +16,8 @@ export interface MemberConfig {
   sp_per_day: number
   jira_account_id: string | null
   country?: string  // "PT", "UK", "ES", "US"
+  employee_number?: number
+  supervisor?: string
 }
 
 export interface Config {
@@ -32,6 +34,9 @@ export interface Config {
   local_holidays?: LocalHoliday[]
   bootstrapped?: boolean
   jira_project_key?: string
+  oncall_schedule_id?: string
+  oncall_department?: string
+  oncall_supervisor?: string
 }
 
 const DEFAULT_CONFIG: Config = {
@@ -56,7 +61,9 @@ export function getConfig(): Config {
     fs.writeFileSync(configPath, JSON.stringify(DEFAULT_CONFIG, null, 2))
     return DEFAULT_CONFIG
   }
-  return JSON.parse(fs.readFileSync(configPath, 'utf8')) as Config
+  const config = JSON.parse(fs.readFileSync(configPath, 'utf8')) as Config
+  config.team_members = [...config.team_members].sort((a, b) => a.name.localeCompare(b.name))
+  return config
 }
 
 export function saveConfig(config: Config): void {

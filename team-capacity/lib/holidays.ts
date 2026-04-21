@@ -188,6 +188,13 @@ export function getHolidaysInSprintForCountry(
   return filterToSprint(allHolidays, startDate, endDate)
 }
 
+/** Returns true if the given date (YYYY-MM-DD) is a working day for the given country. */
+export function isBusinessDay(dateStr: string, country: string): boolean {
+  const dow = new Date(dateStr + 'T12:00:00Z').getUTCDay()
+  if (dow === 0 || dow === 6) return false
+  return getHolidaysInSprintForCountry(dateStr, dateStr, country).length === 0
+}
+
 /** Backward-compat shorthand: Portuguese holidays only (no local holidays). */
 export function getHolidaysInSprint(startDate: string, endDate: string): HolidayInfo[] {
   return getHolidaysInSprintForCountry(startDate, endDate, 'PT')

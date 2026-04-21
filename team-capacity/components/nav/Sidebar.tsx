@@ -15,6 +15,7 @@ import {
   ArrowLeft,
   ArrowRight,
   GearSix,
+  Bell,
 } from '@phosphor-icons/react'
 
 const nav = [
@@ -25,6 +26,7 @@ const nav = [
   { href: '/sprint-goals', label: 'Sprint Goals', Icon: ClipboardTextIcon },
   { href: '/team', label: 'Team', Icon: Users },
   { href: '/allocation', label: 'Allocation', Icon: Target },
+  { href: '/oncall', label: 'On Call', Icon: Bell },
 ]
 
 const navBottom = [

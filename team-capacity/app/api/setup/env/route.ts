@@ -5,7 +5,7 @@ import { getConfig, saveConfig } from '@/lib/data/config'
 
 const ENV_PATH = path.join(process.cwd(), '.env.local')
 
-const MANAGED_KEYS = ['JIRA_BASE_URL', 'JIRA_EMAIL', 'JIRA_API_TOKEN'] as const
+const MANAGED_KEYS = ['JIRA_BASE_URL', 'JIRA_EMAIL', 'JIRA_API_TOKEN', 'ROOTLY_TOKEN'] as const
 
 function readEnvFile(): Record<string, string> {
   if (!fs.existsSync(ENV_PATH)) return {}
@@ -39,6 +39,11 @@ export async function GET() {
     JIRA_API_TOKEN: vars.JIRA_API_TOKEN ? '••••••••' : (process.env.JIRA_API_TOKEN ? '••••••••' : ''),
     JIRA_PROJECT_KEY: config.jira_project_key ?? '',
     hasToken: !!(vars.JIRA_API_TOKEN || process.env.JIRA_API_TOKEN),
+    ROOTLY_TOKEN: vars.ROOTLY_TOKEN ? '••••••••' : (process.env.ROOTLY_TOKEN ? '••••••••' : ''),
+    hasRootlyToken: !!(vars.ROOTLY_TOKEN || process.env.ROOTLY_TOKEN),
+    oncall_schedule_id: config.oncall_schedule_id ?? '',
+    oncall_department: config.oncall_department ?? '',
+    oncall_supervisor: config.oncall_supervisor ?? '',
   })
 }
 
@@ -49,7 +54,7 @@ export async function POST(req: NextRequest) {
   for (const key of MANAGED_KEYS) {
     const val = body[key]?.trim()
     if (!val) continue
-    if (key === 'JIRA_API_TOKEN' && val === '••••••••') continue
+    if ((key === 'JIRA_API_TOKEN' || key === 'ROOTLY_TOKEN') && val === '••••••••') continue
     toWrite[key] = val
   }
 
@@ -60,11 +65,20 @@ export async function POST(req: NextRequest) {
     process.env[k] = v
   }
 
-  // Save project key to team config (per-team setting)
+  // Save per-team config fields
   const projectKey = body['JIRA_PROJECT_KEY']?.trim()
-  if (projectKey) {
+  const scheduleId = body['oncall_schedule_id']?.trim()
+  const department = body['oncall_department']?.trim()
+  const supervisor = body['oncall_supervisor']?.trim()
+  if (projectKey || scheduleId !== undefined || department !== undefined || supervisor !== undefined) {
     const config = getConfig()
-    saveConfig({ ...config, jira_project_key: projectKey })
+    saveConfig({
+      ...config,
+      ...(projectKey ? { jira_project_key: projectKey } : {}),
+      ...(scheduleId !== undefined ? { oncall_schedule_id: scheduleId } : {}),
+      ...(department !== undefined ? { oncall_department: department } : {}),
+      ...(supervisor !== undefined ? { oncall_supervisor: supervisor } : {}),
+    })
   }
 
   return NextResponse.json({ ok: true })

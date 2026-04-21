@@ -21,11 +21,11 @@ export default function TeamPage() {
   const [config, setConfig] = useState<Config | null>(null)
   const [editIdx, setEditIdx] = useState<number | null>(null)
   const [editName, setEditName] = useState('')
-  const [editSP, setEditSP] = useState('')
   const [editCountry, setEditCountry] = useState('PT')
+  const [editEmpNum, setEditEmpNum] = useState('')
   const [newName, setNewName] = useState('')
-  const [newSP, setNewSP] = useState('1.4')
   const [newCountry, setNewCountry] = useState('PT')
+  const [newEmpNum, setNewEmpNum] = useState('')
   const [adding, setAdding] = useState(false)
 
   async function load() {
@@ -49,18 +49,32 @@ export default function TeamPage() {
   async function saveEdit() {
     if (editIdx === null) return
     const members = [...config!.team_members]
-    members[editIdx] = { ...members[editIdx], name: editName, sp_per_day: parseFloat(editSP), country: editCountry }
+    members[editIdx] = {
+      ...members[editIdx],
+      name: editName,
+      country: editCountry,
+      employee_number: editEmpNum ? parseInt(editEmpNum) : undefined,
+    }
     await saveMembers(members)
     setEditIdx(null)
   }
 
   async function addMember() {
     if (!newName.trim()) return
-    const members = [...config!.team_members, { name: newName, sp_per_day: parseFloat(newSP), jira_account_id: null, country: newCountry }]
+    const members = [
+      ...config!.team_members,
+      {
+        name: newName,
+        sp_per_day: config!.sp_per_day,
+        jira_account_id: null,
+        country: newCountry,
+        employee_number: newEmpNum ? parseInt(newEmpNum) : undefined,
+      },
+    ]
     await saveMembers(members)
     setNewName('')
-    setNewSP('1.4')
     setNewCountry('PT')
+    setNewEmpNum('')
     setAdding(false)
   }
 
@@ -70,7 +84,16 @@ export default function TeamPage() {
     await saveMembers(members)
   }
 
+  function startEdit(idx: number) {
+    const m = config!.team_members[idx]
+    setEditIdx(idx)
+    setEditName(m.name)
+    setEditCountry(m.country ?? 'PT')
+    setEditEmpNum(m.employee_number != null ? String(m.employee_number) : '')
+  }
+
   const selectCls = 'border border-gray-300 rounded px-2 py-1 text-sm bg-white'
+  const cellInputCls = 'border border-gray-300 rounded px-2 py-1 text-sm'
 
   return (
     <div>
@@ -80,9 +103,9 @@ export default function TeamPage() {
       </div>
 
       {adding && (
-        <div className="mb-4 flex gap-3 items-end bg-gray-50 border border-gray-200 rounded p-4">
+        <div className="mb-4 flex flex-wrap gap-3 items-end bg-gray-50 border border-gray-200 rounded p-4">
           <Input label="Name" value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Full name" />
-          <Input label="SP / day" value={newSP} onChange={(e) => setNewSP(e.target.value)} type="number" step="0.1" className="w-24" />
+          <Input label="Emp #" value={newEmpNum} onChange={(e) => setNewEmpNum(e.target.value)} type="number" className="w-24" />
           <div className="flex flex-col gap-1">
             <label className="text-xs font-medium text-gray-600">Country</label>
             <select className={selectCls} value={newCountry} onChange={(e) => setNewCountry(e.target.value)}>
@@ -99,7 +122,7 @@ export default function TeamPage() {
           <thead className="bg-gray-50 border-b border-gray-200">
             <tr>
               <th className="text-left px-4 py-3 font-medium text-gray-600">Name</th>
-              <th className="text-left px-4 py-3 font-medium text-gray-600">SP / day</th>
+              <th className="text-left px-4 py-3 font-medium text-gray-600">Emp #</th>
               <th className="text-left px-4 py-3 font-medium text-gray-600">Country</th>
               <th className="px-4 py-3" />
             </tr>
@@ -108,27 +131,21 @@ export default function TeamPage() {
             {config.team_members.map((m, idx) => (
               <tr key={idx} className="hover:bg-gray-50">
                 <td className="px-4 py-3">
-                  {editIdx === idx ? (
-                    <input className="border border-gray-300 rounded px-2 py-1 text-sm w-48" value={editName} onChange={(e) => setEditName(e.target.value)} />
-                  ) : (
-                    <span className="font-medium">{m.name}</span>
-                  )}
+                  {editIdx === idx
+                    ? <input className={`${cellInputCls} w-44`} value={editName} onChange={(e) => setEditName(e.target.value)} />
+                    : <span className="font-medium">{m.name}</span>}
                 </td>
                 <td className="px-4 py-3">
-                  {editIdx === idx ? (
-                    <input type="number" step="0.1" className="border border-gray-300 rounded px-2 py-1 text-sm w-20" value={editSP} onChange={(e) => setEditSP(e.target.value)} />
-                  ) : (
-                    m.sp_per_day
-                  )}
+                  {editIdx === idx
+                    ? <input type="number" className={`${cellInputCls} w-20`} value={editEmpNum} onChange={(e) => setEditEmpNum(e.target.value)} />
+                    : <span className="text-gray-500 font-mono text-xs">{m.employee_number ?? <span className="text-gray-300">—</span>}</span>}
                 </td>
                 <td className="px-4 py-3">
-                  {editIdx === idx ? (
-                    <select className={selectCls} value={editCountry} onChange={(e) => setEditCountry(e.target.value)}>
-                      {COUNTRIES.map((c) => <option key={c.code} value={c.code}>{c.label}</option>)}
-                    </select>
-                  ) : (
-                    <span className="text-gray-700">{countryLabel(m.country)}</span>
-                  )}
+                  {editIdx === idx
+                    ? <select className={selectCls} value={editCountry} onChange={(e) => setEditCountry(e.target.value)}>
+                        {COUNTRIES.map((c) => <option key={c.code} value={c.code}>{c.label}</option>)}
+                      </select>
+                    : <span className="text-gray-700">{countryLabel(m.country)}</span>}
                 </td>
                 <td className="px-4 py-3 text-right">
                   <div className="flex gap-2 justify-end">
@@ -139,7 +156,7 @@ export default function TeamPage() {
                       </>
                     ) : (
                       <>
-                        <Button size="sm" variant="ghost" onClick={() => { setEditIdx(idx); setEditName(m.name); setEditSP(String(m.sp_per_day)); setEditCountry(m.country ?? 'PT') }}>Edit</Button>
+                        <Button size="sm" variant="ghost" onClick={() => startEdit(idx)}>Edit</Button>
                         <Button size="sm" variant="danger" onClick={() => removeMember(idx)}>Remove</Button>
                       </>
                     )}
