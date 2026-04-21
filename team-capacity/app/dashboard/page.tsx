@@ -1,9 +1,11 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import { Card, CardTitle, CardValue } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
+import { Info } from '@phosphor-icons/react'
 import type { SprintCapacity, TeamMetrics } from '@/lib/capacity/calculations'
 import type { Config } from '@/lib/data/config'
 
@@ -13,6 +15,41 @@ interface CapacityResponse {
   config: Config
   syncedAt: string | null
   hasSprints: boolean
+}
+
+function InfoPopover({ text }: { text: string }) {
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null)
+  const btnRef = useRef<HTMLButtonElement>(null)
+
+  useEffect(() => {
+    if (!pos) return
+    function handle(e: MouseEvent) {
+      if (btnRef.current && !btnRef.current.contains(e.target as Node)) setPos(null)
+    }
+    document.addEventListener('mousedown', handle)
+    return () => document.removeEventListener('mousedown', handle)
+  }, [pos])
+
+  function toggle() {
+    if (pos) { setPos(null); return }
+    const rect = btnRef.current?.getBoundingClientRect()
+    if (rect) setPos({ top: rect.bottom + 6, left: rect.left })
+  }
+
+  return (
+    <>
+      <button ref={btnRef} onClick={toggle} className="flex items-center ml-1">
+        <Info size={13} weight="duotone" className="text-gray-400 hover:text-indigo-500 transition-colors" />
+      </button>
+      {pos && createPortal(
+        <div style={{ position: 'fixed', top: pos.top, left: pos.left, zIndex: 9999 }}
+          className="w-64 bg-gray-900 text-white text-xs rounded-lg px-3 py-2 shadow-lg">
+          {text}
+        </div>,
+        document.body
+      )}
+    </>
+  )
 }
 
 function fmt(n: number | null | undefined) {
@@ -275,21 +312,21 @@ export default function DashboardPage() {
           </p>
           <div className="grid grid-cols-4 gap-4">
             <Card>
-              <CardTitle>Avg velocity</CardTitle>
+              <CardTitle><span className="flex items-center">Avg velocity<InfoPopover text="Average suggested SP across all sprints in the quarter, including future ones. Based on team capacity and allocation settings." /></span></CardTitle>
               <CardValue>{fmt(data.teamMetrics.avgVelocity)} SP</CardValue>
             </Card>
             <Card>
-              <CardTitle>Deliver ≥ Commit</CardTitle>
+              <CardTitle><span className="flex items-center">Deliver ≥ Commit<InfoPopover text="% of closed sprints where delivered SP met or exceeded the initial commitment (SP in the sprint when it began)." /></span></CardTitle>
               <CardValue className="text-green-700">{Math.round(data.teamMetrics.deliverGteCommitPct * 100)}%</CardValue>
             </Card>
             <Card>
-              <CardTitle>Over-commit</CardTitle>
+              <CardTitle><span className="flex items-center">Over-commit<InfoPopover text="% of closed sprints where the initial commitment exceeded the team's calculated capacity SP." /></span></CardTitle>
               <CardValue className={data.teamMetrics.overCommitPct > 0 ? 'text-amber-600' : ''}>
                 {Math.round(data.teamMetrics.overCommitPct * 100)}%
               </CardValue>
             </Card>
             <Card>
-              <CardTitle>Under-deliver</CardTitle>
+              <CardTitle><span className="flex items-center">Under-deliver<InfoPopover text="% of closed sprints where delivered SP fell short of the initial commitment." /></span></CardTitle>
               <CardValue className={data.teamMetrics.underDeliverPct > 0 ? 'text-red-600' : ''}>
                 {Math.round(data.teamMetrics.underDeliverPct * 100)}%
               </CardValue>
