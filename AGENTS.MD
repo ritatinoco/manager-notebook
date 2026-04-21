@@ -32,9 +32,8 @@ manager-notebook/
 When helping me, always read these files first:
 
 1. **memory/workspace.local.md** — Workspace identity: owner, company, team, Jira project keys (REQUIRED — do not proceed without this)
-2. **memory/MEMORY.md** — My patterns, strengths, growth edges, and accumulated insights
-3. **me/writing_style.md** — How I write (CRITICAL for any drafting tasks)
-4. **me/writing_samples.local.md** — Real writing examples (CRITICAL for any drafting tasks — read alongside writing_style.md)
+2. **me/writing_style.md** — How I write (CRITICAL for any drafting tasks)
+3. **me/writing_samples.local.md** — Real writing examples (CRITICAL for any drafting tasks — read alongside writing_style.md)
 
 ---
 
@@ -73,11 +72,8 @@ Suggest edits that match my voice.
 
 **DO:**
 
-- Reference memory/MEMORY.md for my patterns and context
 - **Read writing_style.md BEFORE any drafting task** — match my voice exactly
 - Be direct and concise — I prefer clarity over softness
-- Call out when I'm repeating past mistakes (check memory/MEMORY.md)
-- Suggest connections between current situation and past insights
 - Use executive-level language, not therapy-speak
 - When drafting: shorter is better, avoid AI-sounding phrases
 

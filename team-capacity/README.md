@@ -4,7 +4,9 @@ A sprint capacity planning tool for engineering managers. Replaces manual spread
 
 Built with Next.js 14, TypeScript, and Tailwind CSS.
 
-![Capacity Planner Dashboard](docs/team-capacity-dashboard.png)
+<p align="center">
+  <img src="docs/team-capacity-dashboard.png" width="80%" alt="Capacity Planner Dashboard" />
+</p>
 
 ## Features
 
