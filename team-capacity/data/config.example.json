@@ -1,0 +1,24 @@
+{
+  "sp_per_day": 1.4,
+  "allocations": {
+    "features": 0.65,
+    "discovery": 0.05,
+    "risk": 0.05,
+    "debts": 0.20,
+    "sre": 0.00,
+    "support": 0.05
+  },
+  "local_holidays": [],
+  "team_members": [
+    {
+      "name": "Team Member 1",
+      "sp_per_day": 1.4,
+      "country": "PT"
+    },
+    {
+      "name": "Team Member 2",
+      "sp_per_day": 1.4,
+      "country": "US"
+    }
+  ]
+}
