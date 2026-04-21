@@ -1,7 +1,10 @@
 import path from 'path'
 import fs from 'fs'
+import { getActiveTeamId, teamDataDir } from './teams'
 
-const CONFIG_PATH = path.join(process.cwd(), 'data', 'config.json')
+function getConfigPath() {
+  return path.join(teamDataDir(getActiveTeamId()), 'config.json')
+}
 
 export interface LocalHoliday {
   date: string  // MM-DD
@@ -12,7 +15,7 @@ export interface MemberConfig {
   name: string
   sp_per_day: number
   jira_account_id: string | null
-  country?: string  // "PT" or "US"
+  country?: string  // "PT", "UK", "ES", "US"
 }
 
 export interface Config {
@@ -28,6 +31,7 @@ export interface Config {
   team_members: MemberConfig[]
   local_holidays?: LocalHoliday[]
   bootstrapped?: boolean
+  jira_project_key?: string
 }
 
 const DEFAULT_CONFIG: Config = {
@@ -40,33 +44,24 @@ const DEFAULT_CONFIG: Config = {
     sre: 0.00,
     support: 0.05,
   },
-  team_members: [
-    { name: 'Carlos Xavier', sp_per_day: 1.4, jira_account_id: null, country: 'PT' },
-    { name: 'David Pires', sp_per_day: 1.4, jira_account_id: null, country: 'PT' },
-    { name: 'Pedro Quintas', sp_per_day: 1.4, jira_account_id: null, country: 'PT' },
-    { name: 'Tiago M. Pereira', sp_per_day: 1.4, jira_account_id: null, country: 'PT' },
-    { name: 'Laura Beata', sp_per_day: 1.4, jira_account_id: null, country: 'PT' },
-  ],
-  local_holidays: [
-    { date: '06-13', name: 'Santo António (Lisbon)' },
-  ],
-}
-
-function ensureDataDir() {
-  const dir = path.dirname(CONFIG_PATH)
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true })
+  team_members: [],
+  local_holidays: [],
 }
 
 export function getConfig(): Config {
-  ensureDataDir()
-  if (!fs.existsSync(CONFIG_PATH)) {
-    fs.writeFileSync(CONFIG_PATH, JSON.stringify(DEFAULT_CONFIG, null, 2))
+  const configPath = getConfigPath()
+  const dir = path.dirname(configPath)
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true })
+  if (!fs.existsSync(configPath)) {
+    fs.writeFileSync(configPath, JSON.stringify(DEFAULT_CONFIG, null, 2))
     return DEFAULT_CONFIG
   }
-  return JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8')) as Config
+  return JSON.parse(fs.readFileSync(configPath, 'utf8')) as Config
 }
 
 export function saveConfig(config: Config): void {
-  ensureDataDir()
-  fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2))
+  const configPath = getConfigPath()
+  const dir = path.dirname(configPath)
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true })
+  fs.writeFileSync(configPath, JSON.stringify(config, null, 2))
 }

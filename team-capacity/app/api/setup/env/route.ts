@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import path from 'path'
 import fs from 'fs'
+import { getConfig, saveConfig } from '@/lib/data/config'
 
 const ENV_PATH = path.join(process.cwd(), '.env.local')
 
-const MANAGED_KEYS = ['JIRA_BASE_URL', 'JIRA_EMAIL', 'JIRA_API_TOKEN', 'JIRA_PROJECT_KEY'] as const
+const MANAGED_KEYS = ['JIRA_BASE_URL', 'JIRA_EMAIL', 'JIRA_API_TOKEN'] as const
 
 function readEnvFile(): Record<string, string> {
   if (!fs.existsSync(ENV_PATH)) return {}
@@ -31,11 +32,12 @@ function writeEnvFile(vars: Record<string, string>) {
 
 export async function GET() {
   const vars = readEnvFile()
+  const config = getConfig()
   return NextResponse.json({
     JIRA_BASE_URL: vars.JIRA_BASE_URL ?? process.env.JIRA_BASE_URL ?? '',
     JIRA_EMAIL: vars.JIRA_EMAIL ?? process.env.JIRA_EMAIL ?? '',
     JIRA_API_TOKEN: vars.JIRA_API_TOKEN ? '••••••••' : (process.env.JIRA_API_TOKEN ? '••••••••' : ''),
-    JIRA_PROJECT_KEY: vars.JIRA_PROJECT_KEY ?? process.env.JIRA_PROJECT_KEY ?? '',
+    JIRA_PROJECT_KEY: config.jira_project_key ?? '',
     hasToken: !!(vars.JIRA_API_TOKEN || process.env.JIRA_API_TOKEN),
   })
 }
@@ -47,7 +49,6 @@ export async function POST(req: NextRequest) {
   for (const key of MANAGED_KEYS) {
     const val = body[key]?.trim()
     if (!val) continue
-    // Don't overwrite an existing token if the placeholder was sent back
     if (key === 'JIRA_API_TOKEN' && val === '••••••••') continue
     toWrite[key] = val
   }
@@ -57,6 +58,13 @@ export async function POST(req: NextRequest) {
   // Apply to current process so sync works immediately without restart
   for (const [k, v] of Object.entries(toWrite)) {
     process.env[k] = v
+  }
+
+  // Save project key to team config (per-team setting)
+  const projectKey = body['JIRA_PROJECT_KEY']?.trim()
+  if (projectKey) {
+    const config = getConfig()
+    saveConfig({ ...config, jira_project_key: projectKey })
   }
 
   return NextResponse.json({ ok: true })

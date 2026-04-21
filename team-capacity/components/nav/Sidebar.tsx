@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useState } from 'react'
+import TeamSwitcher from './TeamSwitcher'
 import {
   Lightning,
   ChartBar,
@@ -36,13 +37,9 @@ export default function Sidebar() {
 
   return (
     <aside className={`${collapsed ? 'w-14' : 'w-48'} bg-white border-r border-gray-200 flex flex-col py-6 shrink-0 transition-all duration-200`}>
-      <div className={`flex items-center mb-8 ${collapsed ? 'justify-center px-0' : 'justify-between px-4'}`}>
-        {!collapsed && (
-          <div>
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Client Runtime</p>
-            <p className="text-sm font-bold text-gray-900 mt-1">Capacity Planner</p>
-          </div>
-        )}
+      <div className={`flex items-center mb-2 gap-2 ${collapsed ? 'justify-center px-0' : 'px-3'}`}>
+        {!collapsed && <div className="flex-1 min-w-0"><TeamSwitcher collapsed={false} /></div>}
+        {collapsed && <TeamSwitcher collapsed={true} />}
         <button
           onClick={() => setCollapsed((c) => !c)}
           className="text-gray-400 hover:text-gray-600 p-1 rounded hover:bg-gray-100 shrink-0"
@@ -54,6 +51,7 @@ export default function Sidebar() {
           }
         </button>
       </div>
+      {!collapsed && <p className="text-xs font-semibold text-gray-300 uppercase tracking-wider px-3 mb-3">Capacity Planner</p>}
 
       <nav className="flex flex-col gap-1 px-2 flex-1">
         {nav.map(({ href, label, Icon }) => {

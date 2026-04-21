@@ -1,11 +1,17 @@
 import { NextResponse } from 'next/server'
-import { readFileSync, writeFileSync } from 'fs'
-import { join } from 'path'
+import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs'
+import { join, dirname } from 'path'
+import { getActiveTeamId, teamDataDir } from '@/lib/data/teams'
 
-const FILE = join(process.cwd(), 'data/sprint-comments.json')
+function getFile() {
+  return join(teamDataDir(getActiveTeamId()), 'sprint-comments.json')
+}
 
 function read(): Record<string, string> {
-  try { return JSON.parse(readFileSync(FILE, 'utf8')) } catch { return {} }
+  const file = getFile()
+  const dir = dirname(file)
+  if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
+  try { return JSON.parse(readFileSync(file, 'utf8')) } catch { return {} }
 }
 
 export async function GET() {
@@ -17,6 +23,6 @@ export async function POST(req: Request) {
   const data = read()
   if (comment) data[sprint] = comment
   else delete data[sprint]
-  writeFileSync(FILE, JSON.stringify(data, null, 2))
+  writeFileSync(getFile(), JSON.stringify(data, null, 2))
   return NextResponse.json({ ok: true })
 }

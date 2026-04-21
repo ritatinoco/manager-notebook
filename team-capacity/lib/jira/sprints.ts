@@ -1,4 +1,5 @@
 import { jiraFetch } from './client'
+import { getConfig } from '@/lib/data/config'
 
 interface JiraBoard {
   id: number
@@ -16,8 +17,8 @@ interface JiraSprint {
 }
 
 export async function getRARBoardId(): Promise<number> {
-  const projectKey = process.env.JIRA_PROJECT_KEY
-  if (!projectKey) throw new Error('JIRA_PROJECT_KEY is not set in .env.local')
+  const projectKey = getConfig().jira_project_key ?? process.env.JIRA_PROJECT_KEY
+  if (!projectKey) throw new Error('JIRA_PROJECT_KEY is not configured for this team')
   const data = await jiraFetch<{ values: JiraBoard[] }>(
     `/rest/agile/1.0/board?projectKeyOrId=${projectKey}&maxResults=10`
   )

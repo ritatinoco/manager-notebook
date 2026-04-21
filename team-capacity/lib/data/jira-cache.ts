@@ -1,7 +1,10 @@
 import path from 'path'
 import fs from 'fs'
+import { getActiveTeamId, teamDataDir } from './teams'
 
-const CACHE_PATH = path.join(process.cwd(), 'data', 'jira-cache.json')
+function getCachePath() {
+  return path.join(teamDataDir(getActiveTeamId()), 'jira-cache.json')
+}
 
 export interface SprintCache {
   id: number
@@ -24,18 +27,17 @@ export interface JiraCache {
 
 const EMPTY: JiraCache = { syncedAt: null, boardId: null, sprints: [] }
 
-function ensureDataDir() {
-  const dir = path.dirname(CACHE_PATH)
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true })
-}
-
 export function getJiraCache(): JiraCache {
-  ensureDataDir()
-  if (!fs.existsSync(CACHE_PATH)) return EMPTY
-  return JSON.parse(fs.readFileSync(CACHE_PATH, 'utf8')) as JiraCache
+  const cachePath = getCachePath()
+  const dir = path.dirname(cachePath)
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true })
+  if (!fs.existsSync(cachePath)) return EMPTY
+  return JSON.parse(fs.readFileSync(cachePath, 'utf8')) as JiraCache
 }
 
 export function saveJiraCache(cache: JiraCache): void {
-  ensureDataDir()
-  fs.writeFileSync(CACHE_PATH, JSON.stringify(cache, null, 2))
+  const cachePath = getCachePath()
+  const dir = path.dirname(cachePath)
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true })
+  fs.writeFileSync(cachePath, JSON.stringify(cache, null, 2))
 }

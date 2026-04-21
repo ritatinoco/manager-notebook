@@ -6,6 +6,10 @@ import { Button } from '@/components/ui/Button'
 const inputCls = 'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400'
 
 export default function SettingsPage() {
+  const [teamName, setTeamName] = useState('')
+  const [activeTeamId, setActiveTeamId] = useState<string | null>(null)
+  const [teamNameStatus, setTeamNameStatus] = useState<'idle' | 'saved'>('idle')
+
   const [fields, setFields] = useState({
     JIRA_BASE_URL: '',
     JIRA_EMAIL: '',
@@ -26,6 +30,11 @@ export default function SettingsPage() {
         JIRA_PROJECT_KEY: d.JIRA_PROJECT_KEY,
       })
       setHasToken(d.hasToken)
+    })
+    fetch('/api/active-team').then((r) => r.json()).then((d) => {
+      setActiveTeamId(d.activeTeamId)
+      const active = d.teams.find((t: { id: string; name: string }) => t.id === d.activeTeamId)
+      if (active) setTeamName(active.name)
     })
   }, [])
 
@@ -48,6 +57,19 @@ export default function SettingsPage() {
     if (res.ok) setTimeout(() => setSaveStatus('idle'), 2500)
   }
 
+  async function saveTeamName() {
+    if (!activeTeamId || !teamName.trim()) return
+    const res = await fetch('/api/active-team', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: activeTeamId, name: teamName.trim() }),
+    })
+    if (res.ok) {
+      setTeamNameStatus('saved')
+      setTimeout(() => setTeamNameStatus('idle'), 2500)
+    }
+  }
+
   async function sync() {
     setSyncStatus('syncing')
     setSyncMsg('')
@@ -65,6 +87,24 @@ export default function SettingsPage() {
   return (
     <div className="max-w-xl">
       <h1 className="text-xl font-bold text-gray-900 mb-6">Settings</h1>
+
+      <div className="bg-white border border-gray-200 rounded-xl p-6 mb-4">
+        <h2 className="text-sm font-semibold text-gray-700 mb-1">Team</h2>
+        <p className="text-xs text-gray-400 mb-4">Rename this team as it appears in the sidebar.</p>
+        <div className="flex items-center gap-3">
+          <input
+            className={`${inputCls} max-w-xs`}
+            placeholder="Team name"
+            value={teamName}
+            onChange={(e) => { setTeamName(e.target.value); setTeamNameStatus('idle') }}
+            onKeyDown={(e) => { if (e.key === 'Enter') saveTeamName() }}
+          />
+          <Button size="sm" onClick={saveTeamName} disabled={!teamName.trim()}>
+            Save
+          </Button>
+          {teamNameStatus === 'saved' && <span className="text-sm text-green-600">✓ Saved</span>}
+        </div>
+      </div>
 
       <div className="bg-white border border-gray-200 rounded-xl p-6 mb-4">
         <h2 className="text-sm font-semibold text-gray-700 mb-1">Jira Connection</h2>
