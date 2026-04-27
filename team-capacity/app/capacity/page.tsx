@@ -123,7 +123,7 @@ function CapacityView({
                 {matrix.map((sc) => (
                   <th key={sc.sprint.id} className="px-3 py-3 font-medium text-gray-600 text-center whitespace-nowrap min-w-28">
                     <div>{sc.sprint.name}</div>
-                    <div className="text-xs text-gray-400 font-normal">{sc.sprint.startDate?.slice(5)}</div>
+                    <div className="text-xs text-gray-400 font-normal">{fmtShort(sc.sprint.startDate ?? '')} → {fmtEndShort(sc.sprint.endDate ?? '')}</div>
                   </th>
                 ))}
               </tr>
@@ -231,14 +231,160 @@ function CapacityView({
   )
 }
 
+function fmtShort(iso: string) {
+  return new Date(iso + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+}
+
+// Jira endDate is exclusive (first day of next sprint) — display the day before
+function fmtEndShort(iso: string) {
+  const d = new Date(iso + 'T00:00:00Z')
+  d.setUTCDate(d.getUTCDate() - 1)
+  return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+}
+
+function addDays(isoDate: string, days: number): string {
+  const d = new Date(isoDate + 'T00:00:00Z')
+  d.setUTCDate(d.getUTCDate() + days)
+  return d.toISOString().slice(0, 10)
+}
+
+function BootstrapPanel({
+  quarter,
+  onCreated,
+}: {
+  quarter: string
+  onCreated: () => void
+}) {
+  const [open, setOpen] = useState(false)
+  const [form, setForm] = useState({ startDate: '', sprintCount: 6, sprintDuration: 14, namePrefix: '' })
+  const [status, setStatus] = useState<'idle' | 'saving' | 'error'>('idle')
+
+  useEffect(() => {
+    fetch('/api/capacity/bootstrap').then((r) => r.json()).then((d) => {
+      setForm((f) => ({ ...f, namePrefix: d.namePrefix, sprintCount: d.sprintCount, sprintDuration: d.sprintDuration }))
+    })
+  }, [])
+
+  const preview = form.startDate
+    ? Array.from({ length: form.sprintCount }, (_, i) => {
+        const start = addDays(form.startDate, i * form.sprintDuration)
+        const end = addDays(form.startDate, (i + 1) * form.sprintDuration - 1)
+        return { name: `${form.namePrefix} ${quarter}.${i + 1}`, start, end }
+      })
+    : []
+
+  async function create() {
+    setStatus('saving')
+    const res = await fetch('/api/capacity/bootstrap', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ quarter, ...form }),
+    })
+    if (res.ok) { onCreated() }
+    else setStatus('error')
+  }
+
+  const inputCls = 'border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400'
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl p-6 max-w-lg">
+      <p className="text-sm text-gray-500 mb-3">No sprints for this quarter yet.</p>
+      {!open ? (
+        <button
+          onClick={() => setOpen(true)}
+          className="text-sm text-indigo-600 font-medium hover:underline"
+        >
+          Bootstrap {quarter} →
+        </button>
+      ) : (
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">First sprint start</label>
+              <input
+                type="date"
+                className={inputCls + ' w-full'}
+                value={form.startDate}
+                onChange={(e) => setForm((f) => ({ ...f, startDate: e.target.value }))}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Sprint prefix</label>
+              <input
+                className={inputCls + ' w-full'}
+                value={form.namePrefix}
+                onChange={(e) => setForm((f) => ({ ...f, namePrefix: e.target.value }))}
+                placeholder="e.g. RAR"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Number of sprints</label>
+              <input
+                type="number"
+                min={1}
+                max={12}
+                className={inputCls + ' w-full'}
+                value={form.sprintCount}
+                onChange={(e) => setForm((f) => ({ ...f, sprintCount: parseInt(e.target.value) || 6 }))}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Duration (days)</label>
+              <input
+                type="number"
+                min={7}
+                max={30}
+                className={inputCls + ' w-full'}
+                value={form.sprintDuration}
+                onChange={(e) => setForm((f) => ({ ...f, sprintDuration: parseInt(e.target.value) || 14 }))}
+              />
+            </div>
+          </div>
+
+          {preview.length > 0 && (
+            <div className="bg-gray-50 rounded-lg px-4 py-3">
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Preview</p>
+              <div className="space-y-1">
+                {preview.map((s) => (
+                  <div key={s.name} className="flex justify-between text-sm">
+                    <span className="font-medium text-gray-700">{s.name}</span>
+                    <span className="text-gray-400">{fmtShort(s.start)} → {fmtShort(s.end)}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="flex items-center gap-3">
+            <button
+              onClick={create}
+              disabled={!form.startDate || !form.namePrefix || status === 'saving'}
+              className="text-sm bg-indigo-600 text-white rounded-lg px-4 py-1.5 font-medium hover:bg-indigo-700 disabled:opacity-40 transition-colors"
+            >
+              {status === 'saving' ? 'Creating…' : 'Create sprints'}
+            </button>
+            <button onClick={() => setOpen(false)} className="text-sm text-gray-500 hover:text-gray-700">
+              Cancel
+            </button>
+            {status === 'error' && <span className="text-sm text-red-600">Failed — try again</span>}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function CapacityPage() {
   const [data, setData] = useState<CapacityResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState<'current' | 'next'>('current')
 
-  useEffect(() => {
+  function reload() {
+    setLoading(true)
     fetch('/api/capacity').then((r) => r.json()).then(setData).finally(() => setLoading(false))
-  }, [])
+  }
+
+  useEffect(() => { reload() }, [])
 
   if (loading) return <div className="text-sm text-gray-500">Loading...</div>
   if (!data) return <div className="text-sm text-red-500">Failed to load capacity data.</div>
@@ -289,10 +435,10 @@ export default function CapacityPage() {
           <button
             key={t.id}
             onClick={() => setTab(t.id)}
-            className={`px-4 py-2 text-sm font-medium rounded-t transition-colors ${
+            className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
               tab === t.id
-                ? 'bg-white border border-b-white border-gray-200 text-indigo-700 -mb-px'
-                : 'text-gray-500 hover:text-gray-700'
+                ? 'border-indigo-600 text-indigo-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
             }`}
           >
             {t.label}
@@ -301,7 +447,7 @@ export default function CapacityPage() {
       </div>
 
       {activeMatrix.length === 0 ? (
-        <p className="text-sm text-gray-500">No sprints for this quarter yet.</p>
+        <BootstrapPanel quarter={tab === 'next' ? (futureQ ?? '') : (currentQ ?? '')} onCreated={() => { reload(); setTab(tab) }} />
       ) : (
         <CapacityView matrix={activeMatrix} config={config} />
       )}

@@ -5,6 +5,18 @@ import type { Config } from '@/lib/data/config'
 import type { AbsencesData } from '@/lib/data/absences'
 import type { HolidayInfo, SprintCapacity } from '@/lib/capacity/calculations'
 
+function fmtDate(iso: string | undefined): string {
+  if (!iso) return '—'
+  return new Date(iso + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+}
+
+function fmtEndDate(iso: string | undefined): string {
+  if (!iso) return '—'
+  const d = new Date(iso + 'T00:00:00Z')
+  d.setUTCDate(d.getUTCDate() - 1)
+  return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+}
+
 function extractQuarter(sprintName: string): string | null {
   const m = sprintName.match(/(\d{2}\.Q\d)/)
   return m ? m[1] : null
@@ -56,11 +68,8 @@ function SprintTable({
                 {sprintRows.map(({ sprint }) => (
                   <th key={sprint.id} className="px-3 py-3 font-medium text-gray-600 text-center whitespace-nowrap min-w-24">
                     <div>{sprint.name}</div>
-                    <div
-                      className="text-xs text-gray-400 font-normal"
-                      title={sprint.startDate && sprint.endDate ? `${sprint.startDate} → ${sprint.endDate}` : undefined}
-                    >
-                      {sprint.startDate?.slice(5)}
+                    <div className="text-xs text-gray-400 font-normal">
+                      {fmtDate(sprint.startDate)} → {fmtEndDate(sprint.endDate)}
                     </div>
                   </th>
                 ))}

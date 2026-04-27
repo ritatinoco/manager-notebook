@@ -17,6 +17,7 @@ export interface SprintCache {
   committedSP: number
   deliveredSP: number
   workloadByName: Record<string, number>
+  bootstrapped?: boolean
 }
 
 export interface JiraCache {

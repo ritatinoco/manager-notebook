@@ -20,6 +20,25 @@ export async function jiraFetch<T>(path: string): Promise<T> {
   return res.json() as Promise<T>
 }
 
+export async function jiraPost<T>(path: string, body: unknown): Promise<T> {
+  const url = `${BASE_URL}${path}`
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      Authorization: authHeader,
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+    cache: 'no-store',
+  })
+  if (!res.ok) {
+    const text = await res.text()
+    throw new Error(`Jira API error ${res.status} for ${path}: ${text}`)
+  }
+  return res.json() as Promise<T>
+}
+
 export async function jiraPut<T>(path: string, body: unknown): Promise<T> {
   const url = `${BASE_URL}${path}`
   const res = await fetch(url, {

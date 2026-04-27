@@ -34,6 +34,7 @@ export interface Config {
   local_holidays?: LocalHoliday[]
   bootstrapped?: boolean
   jira_project_key?: string
+  jira_team_id?: string
   oncall_schedule_id?: string
   oncall_department?: string
   oncall_supervisor?: string

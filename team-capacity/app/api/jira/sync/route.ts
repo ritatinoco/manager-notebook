@@ -4,6 +4,10 @@ import { getSprintVelocity, getBoardVelocity } from '@/lib/jira/velocity'
 import { getJiraCache, saveJiraCache } from '@/lib/data/jira-cache'
 import type { SprintCache } from '@/lib/data/jira-cache'
 
+function extractQ(name: string): string | null {
+  return name.match(/(\d{2}\.Q\d)/)?.[1] ?? null
+}
+
 export async function POST() {
   if (!process.env.JIRA_BASE_URL || !process.env.JIRA_API_TOKEN) {
     return NextResponse.json(
@@ -67,8 +71,14 @@ export async function POST() {
       })
     }
 
+    // Keep bootstrapped sprints for quarters not yet covered by real Jira data
+    const realQuarters = new Set(syncedSprints.map((s) => extractQ(s.name)).filter(Boolean))
+    const bootstrappedToKeep = existing.sprints
+      .filter((s) => s.bootstrapped)
+      .filter((s) => { const q = extractQ(s.name); return q && !realQuarters.has(q) })
+
     const syncedAt = new Date().toISOString()
-    saveJiraCache({ syncedAt, boardId, sprints: syncedSprints })
+    saveJiraCache({ syncedAt, boardId, sprints: [...syncedSprints, ...bootstrappedToKeep] })
 
     return NextResponse.json({
       ok: true,

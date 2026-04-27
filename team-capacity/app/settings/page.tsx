@@ -34,6 +34,8 @@ export default function SettingsPage() {
     JIRA_EMAIL: '',
     JIRA_API_TOKEN: '',
     JIRA_PROJECT_KEY: '',
+    JIRA_PM_PROJECT_KEY: '',
+    jira_team_id: '',
   })
   const [hasToken, setHasToken] = useState(false)
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
@@ -47,6 +49,8 @@ export default function SettingsPage() {
   const [rootlySaveStatus, setRootlySaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'ok' | 'error'>('idle')
   const [syncMsg, setSyncMsg] = useState('')
+  const [deleteConfirm, setDeleteConfirm] = useState(false)
+  const [deleteStatus, setDeleteStatus] = useState<'idle' | 'deleting' | 'error'>('idle')
 
   useEffect(() => {
     fetch('/api/setup/env').then((r) => r.json()).then((d) => {
@@ -55,6 +59,8 @@ export default function SettingsPage() {
         JIRA_EMAIL: d.JIRA_EMAIL,
         JIRA_API_TOKEN: d.JIRA_API_TOKEN,
         JIRA_PROJECT_KEY: d.JIRA_PROJECT_KEY,
+        JIRA_PM_PROJECT_KEY: d.JIRA_PM_PROJECT_KEY,
+        jira_team_id: d.jira_team_id,
       })
       setHasToken(d.hasToken)
       setRootly({
@@ -129,6 +135,24 @@ export default function SettingsPage() {
     })
     setRootlySaveStatus(res.ok ? 'saved' : 'error')
     if (res.ok) setTimeout(() => setRootlySaveStatus('idle'), 2500)
+  }
+
+  async function deleteTeam() {
+    if (!activeTeamId) return
+    setDeleteStatus('deleting')
+    const res = await fetch('/api/teams', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: activeTeamId }),
+    })
+    if (res.ok) {
+      window.location.href = '/dashboard'
+    } else {
+      const json = await res.json()
+      alert(json.error ?? 'Could not delete team')
+      setDeleteStatus('error')
+      setDeleteConfirm(false)
+    }
   }
 
   async function sync() {
@@ -219,6 +243,16 @@ export default function SettingsPage() {
               <label className="block text-xs font-medium text-gray-600 mb-1">Project Key</label>
               <input className={inputCls} placeholder="e.g. RAR, PROJ" value={fields.JIRA_PROJECT_KEY} onChange={set('JIRA_PROJECT_KEY')} />
             </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">PM Project Key</label>
+              <input className={inputCls} placeholder="e.g. PLAT, PM" value={fields.JIRA_PM_PROJECT_KEY} onChange={set('JIRA_PM_PROJECT_KEY')} />
+              <p className="text-xs text-gray-400 mt-1">Project containing Value Milestones (for Roadmap page)</p>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Jira Team ID</label>
+              <input className={inputCls} placeholder="e.g. d959f7e6-b222-4955-b5be-b6bdc698e10b-305" value={fields.jira_team_id} onChange={set('jira_team_id')} />
+              <p className="text-xs text-gray-400 mt-1">Used to filter Epics assigned to this team on the Roadmap page</p>
+            </div>
           </div>
 
           <div className="flex items-center gap-3 mt-5">
@@ -299,6 +333,35 @@ export default function SettingsPage() {
           {syncStatus === 'ok' && <span className="text-sm text-green-600">✓ {syncMsg}</span>}
           {syncStatus === 'error' && <span className="text-sm text-red-600">{syncMsg}</span>}
         </div>
+      </div>
+
+      <div className="border border-red-200 rounded-xl p-6 max-w-lg mt-4">
+        <h2 className="text-sm font-semibold text-red-700 mb-1">Danger Zone</h2>
+        <p className="text-xs text-gray-400 mb-4">Permanently delete this team and all its data. This cannot be undone.</p>
+        {!deleteConfirm ? (
+          <button
+            onClick={() => setDeleteConfirm(true)}
+            className="text-sm text-red-600 border border-red-300 rounded-lg px-3 py-1.5 hover:bg-red-50 transition-colors"
+          >
+            Delete team…
+          </button>
+        ) : (
+          <div className="flex items-center gap-3">
+            <button
+              onClick={deleteTeam}
+              disabled={deleteStatus === 'deleting'}
+              className="text-sm text-white bg-red-600 rounded-lg px-3 py-1.5 hover:bg-red-700 transition-colors disabled:opacity-50"
+            >
+              {deleteStatus === 'deleting' ? 'Deleting…' : `Yes, delete "${teamName}"`}
+            </button>
+            <button
+              onClick={() => setDeleteConfirm(false)}
+              className="text-sm text-gray-500 hover:text-gray-700"
+            >
+              Cancel
+            </button>
+          </div>
+        )}
       </div>
     </div>
   )
