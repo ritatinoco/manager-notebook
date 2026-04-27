@@ -37,9 +37,9 @@ export async function POST() {
     for (const js of jiraSprints) {
       if (!js.startDate || !js.endDate) continue
 
-      // Reuse cached data for closed sprints that already have SP data
+      // Reuse cached data for closed sprints that already have SP data + the newer doneSP split
       const cached = existingById.get(js.id)
-      if (js.state === 'closed' && cached && (cached.committedSP > 0 || cached.deliveredSP > 0)) {
+      if (js.state === 'closed' && cached && (cached.committedSP > 0 || cached.deliveredSP > 0) && cached.doneSP !== undefined) {
         syncedSprints.push({ ...cached, state: js.state })
         continue
       }
@@ -49,11 +49,15 @@ export async function POST() {
       let deliveredSP = 0
       let workloadByName: Record<string, number> = {}
 
+      let doneSP = 0
+      let waitingForReleaseSP = 0
       if (js.state !== 'future') {
         const velocity = await getSprintVelocity(js.id, boardId, boardVelocity.get(js.id))
         initialCommittedSP = velocity.initialCommittedSP
         committedSP = velocity.committedSP
         deliveredSP = velocity.deliveredSP
+        doneSP = velocity.doneSP
+        waitingForReleaseSP = velocity.waitingForReleaseSP
         workloadByName = velocity.workloadByName
       }
 
@@ -67,6 +71,8 @@ export async function POST() {
         initialCommittedSP,
         committedSP,
         deliveredSP,
+        doneSP,
+        waitingForReleaseSP,
         workloadByName,
       })
     }

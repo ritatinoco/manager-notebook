@@ -89,15 +89,18 @@ function SprintHealthBar({ sc }: { sc: SprintCapacity }) {
   const timeElapsedPct = Math.round((elapsedWorkingDays / totalWorkingDays) * 100)
 
   const total = sc.sprint.committedSP || 1
-  const done = sc.sprint.deliveredSP
-  const remaining = Math.max(0, total - done)
-  const workCompletePct = Math.round((done / (sc.sprint.initialCommittedSP || total)) * 100)
+  const doneSP = sc.sprint.doneSP ?? sc.sprint.deliveredSP
+  const wfrSP = sc.sprint.waitingForReleaseSP ?? 0
+  const delivered = sc.sprint.deliveredSP
+  const remaining = Math.max(0, total - delivered)
+  const workCompletePct = Math.round((delivered / (sc.sprint.initialCommittedSP || total)) * 100)
 
   const scopeChange = sc.sprint.initialCommittedSP > 0
     ? Math.round(((sc.sprint.committedSP - sc.sprint.initialCommittedSP) / sc.sprint.initialCommittedSP) * 100)
     : 0
 
-  const donePct = (done / total) * 100
+  const donePct = (doneSP / total) * 100
+  const wfrPct = (wfrSP / total) * 100
   const remainingPct = (remaining / total) * 100
 
   return (
@@ -111,23 +114,31 @@ function SprintHealthBar({ sc }: { sc: SprintCapacity }) {
 
       {/* Progress bar */}
       <div className="flex rounded-lg overflow-hidden h-8 mb-2 text-xs font-bold bg-gray-100">
-        {done > 0 && (
-          <div style={{ width: `${donePct}%` }} title={`${done} SP delivered (Done + Waiting for Release)`} className="bg-indigo-600 text-white flex items-center justify-center shrink-0 transition-all cursor-default">
-            {done}
+        {doneSP > 0 && (
+          <div style={{ width: `${donePct}%`, backgroundColor: '#76ca38' }} title={`${doneSP} SP Done`} className="text-white flex items-center justify-center shrink-0 transition-all cursor-default">
+            {doneSP}
+          </div>
+        )}
+        {wfrSP > 0 && (
+          <div style={{ width: `${wfrPct}%` }} title={`${wfrSP} SP Waiting for Release`} className="bg-violet-400 text-white flex items-center justify-center shrink-0 transition-all cursor-default">
+            {wfrSP}
           </div>
         )}
         {remaining > 0 && (
-          <div style={{ width: `${remainingPct}%` }} title={`${remaining} SP still in progress or not started`} className="bg-indigo-100 text-indigo-500 flex items-center justify-center shrink-0 transition-all cursor-default">
+          <div style={{ width: `${remainingPct}%`, backgroundColor: '#e8eef2' }} title={`${remaining} SP still in progress or not started`} className="text-gray-500 flex items-center justify-center shrink-0 transition-all cursor-default">
             {remaining}
           </div>
         )}
       </div>
       <div className="flex gap-3 mb-3">
         <span className="flex items-center gap-1 text-xs text-gray-400">
-          <span className="inline-block w-2.5 h-2.5 rounded-sm bg-indigo-600" />Delivered
+          <span className="inline-block w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: '#76ca38' }} />Done
         </span>
         <span className="flex items-center gap-1 text-xs text-gray-400">
-          <span className="inline-block w-2.5 h-2.5 rounded-sm bg-indigo-100 border border-indigo-200" />Remaining
+          <span className="inline-block w-2.5 h-2.5 rounded-sm bg-violet-400" />Waiting for Release
+        </span>
+        <span className="flex items-center gap-1 text-xs text-gray-400">
+          <span className="inline-block w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: '#e8eef2' }} />Remaining
         </span>
       </div>
 
@@ -160,6 +171,32 @@ function SprintHealthBar({ sc }: { sc: SprintCapacity }) {
   )
 }
 
+function localDateStr(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+function findCurrentSprint(matrix: SprintCapacity[]): SprintCapacity | undefined {
+  const now = new Date()
+  const today = localDateStr(now)
+  // All sprints containing today — pick the one with the latest startDate
+  // (handles boundary overlap where a new sprint starts the same day the old one ends)
+  const todayMatches = matrix.filter((sc) => sc.sprint.startDate <= today && sc.sprint.endDate >= today)
+  if (todayMatches.length > 0) {
+    return todayMatches.sort((a, b) => b.sprint.startDate.localeCompare(a.sprint.startDate))[0]
+  }
+  // Fall back to any sprint overlapping the current calendar week (Mon–Sun), latest startDate wins
+  const dow = now.getDay()
+  const daysFromMonday = dow === 0 ? 6 : dow - 1
+  const weekStart = new Date(now)
+  weekStart.setDate(now.getDate() - daysFromMonday)
+  const weekEnd = new Date(weekStart)
+  weekEnd.setDate(weekStart.getDate() + 6)
+  const weekMatches = matrix.filter(
+    (sc) => sc.sprint.startDate <= localDateStr(weekEnd) && sc.sprint.endDate >= localDateStr(weekStart)
+  )
+  return weekMatches.sort((a, b) => b.sprint.startDate.localeCompare(a.sprint.startDate))[0]
+}
+
 export default function DashboardPage() {
   const [data, setData] = useState<CapacityResponse | null>(null)
   const [syncing, setSyncing] = useState(false)
@@ -179,8 +216,7 @@ export default function DashboardPage() {
       if (commentsRes.ok) {
         const c = await commentsRes.json()
         setComments(c)
-        const today = new Date().toISOString().slice(0, 10)
-        const current = cap.matrix?.find((sc: SprintCapacity) => sc.sprint.startDate <= today && sc.sprint.endDate >= today)
+        const current = findCurrentSprint(cap.matrix ?? [])
         if (current) setCommentDraft(c[current.sprint.name] ?? '')
       }
     }
@@ -230,8 +266,8 @@ export default function DashboardPage() {
     )
   }
 
-  const today = new Date().toISOString().slice(0, 10)
-  const current = data.matrix.find((sc) => sc.sprint.startDate <= today && sc.sprint.endDate >= today)
+  const today = localDateStr(new Date())
+  const current = findCurrentSprint(data.matrix)
   const upcoming = data.matrix.filter((sc) => sc.sprint.startDate > today).slice(0, 3)
 
   return (

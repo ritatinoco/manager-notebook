@@ -16,6 +16,8 @@ export interface SprintVelocity {
   initialCommittedSP: number
   committedSP: number
   deliveredSP: number
+  doneSP: number
+  waitingForReleaseSP: number
   workloadByName: Record<string, number>
 }
 
@@ -88,7 +90,8 @@ export async function getSprintVelocity(
   )
 
   let committedSP = 0
-  let deliveredSP = 0
+  let doneSP = 0
+  let waitingForReleaseSP = 0
   const workloadByName: Record<string, number> = {}
 
   for (const issue of data.issues ?? []) {
@@ -97,8 +100,11 @@ export async function getSprintVelocity(
     const statusName = (issue.fields.status as { name: string } | null)?.name ?? ''
     const statusCategoryKey =
       (issue.fields.status as { statusCategory?: { key?: string } } | null)?.statusCategory?.key
-    if (statusCategoryKey === 'done' || statusName === 'Waiting for Release') {
-      deliveredSP += sp
+    const isWFR = statusName === 'Waiting for Release'
+    const isDone = !isWFR && statusCategoryKey === 'done'
+    if (isDone || isWFR) {
+      if (isWFR) waitingForReleaseSP += sp
+      else doneSP += sp
       const assignee = issue.fields.assignee as { displayName: string } | null
       if (assignee?.displayName) {
         workloadByName[assignee.displayName] = (workloadByName[assignee.displayName] ?? 0) + sp
@@ -108,11 +114,15 @@ export async function getSprintVelocity(
 
   return {
     jiraSprintId: sprintId,
-    // Board velocity "estimated" matches Jira's velocity chart (excludes mid-sprint additions).
-    // Fall back to Greenhopper sum, then to committedSP if both are 0.
+    // Board velocity "estimated/completed" matches Jira's velocity chart (authoritative for closed sprints).
+    // Fall back to Greenhopper sum / JQL count when not available.
     initialCommittedSP: velocityEntry?.estimated || reportInitial || committedSP,
     committedSP,
-    deliveredSP,
+    // Use Jira's velocity chart completed value as the canonical deliveredSP — it reflects
+    // what was done when the sprint closed, unlike a JQL scan of current issue statuses.
+    deliveredSP: velocityEntry?.completed || (doneSP + waitingForReleaseSP),
+    doneSP,
+    waitingForReleaseSP,
     workloadByName,
   }
 }

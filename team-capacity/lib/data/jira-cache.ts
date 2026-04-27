@@ -16,6 +16,8 @@ export interface SprintCache {
   initialCommittedSP: number
   committedSP: number
   deliveredSP: number
+  doneSP?: number
+  waitingForReleaseSP?: number
   workloadByName: Record<string, number>
   bootstrapped?: boolean
 }
