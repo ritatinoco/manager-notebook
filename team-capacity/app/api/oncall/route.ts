@@ -45,10 +45,11 @@ export async function GET(req: NextRequest) {
     )
   }
 
-  const monthStart = new Date(year, month - 1, 1)
-  const monthEnd = new Date(year, month, 1) // exclusive — first day of next month
-  const monthStartStr = monthStart.toISOString().slice(0, 10)
-  const monthEndStr = new Date(year, month, 0).toISOString().slice(0, 10) // last day inclusive
+  // Use UTC to avoid timezone-offset errors when converting to ISO date strings
+  const monthStart = new Date(Date.UTC(year, month - 1, 1))
+  const monthEnd = new Date(Date.UTC(year, month, 1)) // exclusive — first day of next month
+  const monthStartStr = `${year}-${String(month).padStart(2, '0')}-01`
+  const monthEndStr = new Date(Date.UTC(year, month, 0)).toISOString().slice(0, 10) // last day inclusive
 
   try {
     const data = await getOnCallShifts(token, config.oncall_schedule_id, monthStart, monthEnd)

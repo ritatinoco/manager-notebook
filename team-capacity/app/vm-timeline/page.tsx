@@ -112,7 +112,7 @@ export default function VMTimelinePage() {
   const [hideDone, setHideDone] = useState(true)
   const [showPaused, setShowPaused] = useState(false)
   type SortBy = 'targetStart' | 'targetEnd' | 'manual'
-  const [sortBy, setSortBy] = useState<SortBy>('targetStart')
+  const [sortBy, setSortBy] = useState<SortBy>('manual')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
   const [priorityOrder, setPriorityOrder] = useState<string[]>([])
   const [showSortPanel, setShowSortPanel] = useState(false)
@@ -234,6 +234,9 @@ export default function VMTimelinePage() {
   const quarters = buildQuarters(rangeStart, rangeEnd)
   const years = buildYears(quarters)
 
+  const oneConferenceDate = new Date(today.getFullYear(), 5, 2) // June 2
+  const oneConferenceLeft = daysBetween(rangeStart, oneConferenceDate) * DAY_PX
+
   function barProps(targetStart: string | null, targetEnd: string | null) {
     const start = targetStart ? new Date(targetStart + 'T00:00:00') : null
     const end = targetEnd ? new Date(targetEnd + 'T00:00:00') : null
@@ -340,6 +343,8 @@ export default function VMTimelinePage() {
         ))}
         <div className="absolute top-0 bottom-0 pointer-events-none z-10"
           style={{ left: todayLeft, width: 1, background: '#818cf8' }} />
+        <div className="absolute top-0 bottom-0 pointer-events-none z-10"
+          style={{ left: oneConferenceLeft, width: 1, background: '#f59e0b' }} />
       </>
     )
   }
@@ -539,6 +544,10 @@ export default function VMTimelinePage() {
                   </div>
                 ))}
                 <div className="absolute top-0 bottom-0 pointer-events-none" style={{ left: todayLeft, width: 1, background: '#818cf8' }} />
+                <div className="absolute bottom-0 pointer-events-none flex flex-col items-center" style={{ left: oneConferenceLeft - 18, width: 36 }}>
+                  <span className="text-amber-500 font-semibold whitespace-nowrap" style={{ fontSize: 9 }}>ONE conf</span>
+                </div>
+                <div className="absolute top-0 bottom-0 pointer-events-none" style={{ left: oneConferenceLeft, width: 1, background: '#f59e0b' }} />
               </div>
             </div>
 
