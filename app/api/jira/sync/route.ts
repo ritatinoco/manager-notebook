@@ -86,11 +86,17 @@ export async function POST() {
     const syncedAt = new Date().toISOString()
     saveJiraCache({ syncedAt, boardId, sprints: [...syncedSprints, ...bootstrappedToKeep] })
 
+    const closedWithDelivery = syncedSprints.filter((s) => s.state === 'closed' && s.deliveredSP > 0)
+    const avgDeliveredSP = closedWithDelivery.length > 0
+      ? Math.round(closedWithDelivery.reduce((s, sp) => s + sp.deliveredSP, 0) / closedWithDelivery.length)
+      : 0
+
     return NextResponse.json({
       ok: true,
       boardId,
       sprintCount: syncedSprints.length,
       syncedAt,
+      avgDeliveredSP,
     })
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 })

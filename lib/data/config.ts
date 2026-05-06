@@ -32,6 +32,9 @@ export interface ManagerProfile {
   country?: string
   supervisor?: string
   eom_id?: number
+  pto_days_per_year?: number
+  /** Name of the team member who covers capacity when the manager is on-call */
+  oncall_substitute?: string
 }
 
 export interface Config {
@@ -54,6 +57,8 @@ export interface Config {
   manager_profile?: ManagerProfile
   /** ISO timestamp of the last successful EOM sync */
   eom_last_synced?: string
+  /** Team average velocity in SP per sprint — used on the allocation page */
+  team_avg_velocity?: number
 }
 
 const DEFAULT_CONFIG: Config = {

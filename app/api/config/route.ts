@@ -22,6 +22,7 @@ export async function PUT(req: NextRequest) {
   if (body.team_members) config.team_members = body.team_members
   if (body.local_holidays !== undefined) config.local_holidays = body.local_holidays
   if (body.bootstrapped !== undefined) config.bootstrapped = body.bootstrapped
+  if (body.team_avg_velocity !== undefined) config.team_avg_velocity = body.team_avg_velocity
   if (body.manager_profile !== undefined) config.manager_profile = { ...config.manager_profile, ...body.manager_profile }
 
   saveConfig(config)
