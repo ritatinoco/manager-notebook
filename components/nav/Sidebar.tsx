@@ -20,7 +20,6 @@ import {
   Rows,
   SquaresFour,
   CaretDown,
-  CalendarDots,
 } from '@phosphor-icons/react'
 
 type NavChild = { href: string; label: string; Icon: React.ElementType }
@@ -50,15 +49,9 @@ const sections: NavSection[] = [
   {
     label: 'PLANNING',
     items: [
-      {
-        label: 'Planning',
-        Icon: CalendarDots,
-        children: [
-          { href: '/roadmap', label: 'Roadmap', Icon: MapTrifold },
-          { href: '/gantt', label: 'Initiatives', Icon: Rows },
-          { href: '/vm-timeline', label: 'VMs', Icon: SquaresFour },
-        ],
-      },
+      { href: '/roadmap', label: 'Roadmap', Icon: MapTrifold },
+      { href: '/gantt', label: 'Initiatives', Icon: Rows },
+      { href: '/vm-timeline', label: 'VMs', Icon: SquaresFour },
     ],
   },
   {
@@ -98,9 +91,8 @@ export default function Sidebar() {
 
   return (
     <aside className={`${collapsed ? 'w-14' : 'w-48'} bg-white border-r border-gray-200 flex flex-col py-6 shrink-0 transition-all duration-200`}>
-      <div className={`flex items-center mb-2 gap-2 ${collapsed ? 'justify-center px-0' : 'px-3'}`}>
-        {!collapsed && <div className="flex-1 min-w-0"><TeamSwitcher collapsed={false} /></div>}
-        {collapsed && <TeamSwitcher collapsed={true} />}
+      <div className={`flex items-center mb-1 gap-2 ${collapsed ? 'justify-center px-0' : 'px-3'}`}>
+        {!collapsed && <p className="flex-1 text-sm font-bold text-gray-800 tracking-tight">Capacity Planner</p>}
         <button
           onClick={() => setCollapsed((c) => !c)}
           className="text-gray-400 hover:text-gray-600 p-1 rounded hover:bg-gray-100 shrink-0"
@@ -112,7 +104,10 @@ export default function Sidebar() {
           }
         </button>
       </div>
-      {!collapsed && <p className="text-xs font-semibold text-gray-300 uppercase tracking-wider px-3 mb-3">Capacity Planner</p>}
+      <div className={`mb-3 ${collapsed ? 'flex justify-center px-0' : 'px-3'}`}>
+        {!collapsed && <div className="flex-1 min-w-0"><TeamSwitcher collapsed={false} /></div>}
+        {collapsed && <TeamSwitcher collapsed={true} />}
+      </div>
 
       <nav className="flex flex-col px-2 flex-1">
         {sections.map((section, si) => (
