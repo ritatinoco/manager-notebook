@@ -16,8 +16,22 @@ export interface MemberConfig {
   sp_per_day: number
   jira_account_id: string | null
   country?: string  // "PT", "UK", "ES", "US"
+  email?: string
   employee_number?: number
   supervisor?: string
+  /** EOM person ID — used to resolve the avatar served by /api/avatars/[id] */
+  eom_id?: number
+}
+
+/** Profile for the manager themselves — used to filter EOM direct reports */
+export interface ManagerProfile {
+  first_name?: string
+  last_name?: string
+  email?: string
+  employee_number?: number
+  country?: string
+  supervisor?: string
+  eom_id?: number
 }
 
 export interface Config {
@@ -34,10 +48,12 @@ export interface Config {
   local_holidays?: LocalHoliday[]
   bootstrapped?: boolean
   jira_project_key?: string
-  jira_team_id?: string
   oncall_schedule_id?: string
   oncall_department?: string
   oncall_supervisor?: string
+  manager_profile?: ManagerProfile
+  /** ISO timestamp of the last successful EOM sync */
+  eom_last_synced?: string
 }
 
 const DEFAULT_CONFIG: Config = {

@@ -25,17 +25,18 @@ function JiraLogo() {
 
 export default function SettingsPage() {
   const [teamName, setTeamName] = useState('')
-  const [teamEM, setTeamEM] = useState('')
+  const [valueStream, setValueStream] = useState('')
   const [activeTeamId, setActiveTeamId] = useState<string | null>(null)
   const [teamSaveStatus, setTeamSaveStatus] = useState<'idle' | 'saved'>('idle')
 
+  const [manager, setManager] = useState({ name: '', email: '' })
+  const [managerSaveStatus, setManagerSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
+
   const [fields, setFields] = useState({
     JIRA_BASE_URL: '',
-    JIRA_EMAIL: '',
     JIRA_API_TOKEN: '',
     JIRA_PROJECT_KEY: '',
     JIRA_PM_PROJECT_KEY: '',
-    jira_team_id: '',
   })
   const [hasToken, setHasToken] = useState(false)
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
@@ -43,7 +44,6 @@ export default function SettingsPage() {
   const [rootly, setRootly] = useState({
     ROOTLY_TOKEN: '',
     oncall_schedule_id: '',
-    oncall_department: '',
   })
   const [hasRootlyToken, setHasRootlyToken] = useState(false)
   const [rootlySaveStatus, setRootlySaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
@@ -52,32 +52,54 @@ export default function SettingsPage() {
   const [deleteConfirm, setDeleteConfirm] = useState(false)
   const [deleteStatus, setDeleteStatus] = useState<'idle' | 'deleting' | 'error'>('idle')
 
+  const [eomToken, setEomToken] = useState('')
+  const [hasEomToken, setHasEomToken] = useState(false)
+  const [eomTokenStatus, setEomTokenStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
+  const [eomSyncStatus, setEomSyncStatus] = useState<'idle' | 'syncing' | 'ok' | 'error'>('idle')
+  const [eomSyncMsg, setEomSyncMsg] = useState('')
+  const [eomLastSynced, setEomLastSynced] = useState<string | null>(null)
+
   useEffect(() => {
     fetch('/api/setup/env').then((r) => r.json()).then((d) => {
+      setManager({ name: d.oncall_supervisor ?? '', email: d.JIRA_EMAIL ?? '' })
       setFields({
         JIRA_BASE_URL: d.JIRA_BASE_URL,
-        JIRA_EMAIL: d.JIRA_EMAIL,
         JIRA_API_TOKEN: d.JIRA_API_TOKEN,
         JIRA_PROJECT_KEY: d.JIRA_PROJECT_KEY,
         JIRA_PM_PROJECT_KEY: d.JIRA_PM_PROJECT_KEY,
-        jira_team_id: d.jira_team_id,
       })
       setHasToken(d.hasToken)
+      setValueStream(d.oncall_department ?? '')
       setRootly({
         ROOTLY_TOKEN: d.ROOTLY_TOKEN,
         oncall_schedule_id: d.oncall_schedule_id,
-        oncall_department: d.oncall_department,
       })
-      setTeamEM(d.oncall_supervisor ?? '')
       setHasRootlyToken(d.hasRootlyToken)
     })
     fetch('/api/active-team').then((r) => r.json()).then((d) => {
       setActiveTeamId(d.activeTeamId)
       const active = d.teams.find((t: { id: string; name: string }) => t.id === d.activeTeamId)
       if (active) setTeamName(active.name)
-
+    })
+    fetch('/api/eom/env').then((r) => r.json()).then((d) => {
+      setHasEomToken(d.hasToken)
+      if (d.EOM_TOKEN) setEomToken(d.EOM_TOKEN)
+    })
+    fetch('/api/config').then((r) => r.json()).then((d) => {
+      if (d.eom_last_synced) setEomLastSynced(d.eom_last_synced)
     })
   }, [])
+
+  async function saveManager() {
+    setManagerSaveStatus('saving')
+    const res = await fetch('/api/setup/env', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ oncall_supervisor: manager.name, JIRA_EMAIL: manager.email }),
+    })
+    setManagerSaveStatus(res.ok ? 'saved' : 'error')
+    if (res.ok) setTimeout(() => setManagerSaveStatus('idle'), 2500)
+  }
 
   function set(key: keyof typeof fields) {
     return (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -92,7 +114,7 @@ export default function SettingsPage() {
     const res = await fetch('/api/setup/env', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(fields),
+      body: JSON.stringify({ ...fields, JIRA_EMAIL: manager.email }),
     })
     setSaveStatus(res.ok ? 'saved' : 'error')
     if (res.ok) setTimeout(() => setSaveStatus('idle'), 2500)
@@ -100,7 +122,7 @@ export default function SettingsPage() {
 
   async function saveTeam() {
     if (!activeTeamId || !teamName.trim()) return
-    const [nameRes, emRes] = await Promise.all([
+    const [nameRes, vsRes] = await Promise.all([
       fetch('/api/active-team', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -109,10 +131,10 @@ export default function SettingsPage() {
       fetch('/api/setup/env', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ oncall_supervisor: teamEM.trim() }),
+        body: JSON.stringify({ oncall_department: valueStream.trim() }),
       }),
     ])
-    if (nameRes.ok && emRes.ok) {
+    if (nameRes.ok && vsRes.ok) {
       setTeamSaveStatus('saved')
       setTimeout(() => setTeamSaveStatus('idle'), 2500)
     }
@@ -169,13 +191,46 @@ export default function SettingsPage() {
     }
   }
 
+  async function saveEomToken() {
+    if (!eomToken.trim() || eomTokenStatus === 'saving') return
+    setEomTokenStatus('saving')
+    const res = await fetch('/api/eom/env', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: eomToken }),
+    })
+    if (res.ok) {
+      setHasEomToken(true)
+      setEomToken('')
+      setEomTokenStatus('saved')
+      setTimeout(() => setEomTokenStatus('idle'), 2500)
+    } else {
+      setEomTokenStatus('error')
+    }
+  }
+
+  async function syncEom() {
+    setEomSyncStatus('syncing')
+    setEomSyncMsg('')
+    const res = await fetch('/api/eom/sync', { method: 'POST' })
+    const json = await res.json()
+    if (res.ok) {
+      setEomSyncStatus('ok')
+      setEomSyncMsg(`Synced ${json.synced} member${json.synced !== 1 ? 's' : ''}`)
+      setEomLastSynced(json.synced_at)
+    } else {
+      setEomSyncStatus('error')
+      setEomSyncMsg(json.error ?? 'Sync failed')
+    }
+  }
+
   return (
     <div className="max-w-5xl">
       <h1 className="text-xl font-bold text-gray-900 mb-6">Settings</h1>
 
-      <div className="bg-white border border-gray-200 rounded-xl p-6 mb-4 max-w-lg">
-        <h2 className="text-sm font-semibold text-gray-700 mb-4">Team</h2>
-        <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-4 mb-4">
+        <div className="bg-white border border-gray-200 rounded-xl p-6">
+          <h2 className="text-sm font-semibold text-gray-700 mb-4">Team</h2>
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">Team name</label>
             <input
@@ -186,19 +241,53 @@ export default function SettingsPage() {
               onKeyDown={(e) => { if (e.key === 'Enter') saveTeam() }}
             />
           </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Engineering Manager</label>
+          <div className="mt-4">
+            <label className="block text-xs font-medium text-gray-600 mb-1">Value Stream</label>
             <input
               className={inputCls}
-              placeholder="Your name — used as supervisor in on-call reports"
-              value={teamEM}
-              onChange={(e) => { setTeamEM(e.target.value); setTeamSaveStatus('idle') }}
+              placeholder="e.g. Web & Mobile"
+              value={valueStream}
+              onChange={(e) => { setValueStream(e.target.value); setTeamSaveStatus('idle') }}
             />
           </div>
+          <div className="flex items-center gap-3 mt-4">
+            <Button size="sm" onClick={saveTeam} disabled={!teamName.trim()}>Save</Button>
+            {teamSaveStatus === 'saved' && <span className="text-sm text-green-600">✓ Saved</span>}
+          </div>
         </div>
-        <div className="flex items-center gap-3 mt-4">
-          <Button size="sm" onClick={saveTeam} disabled={!teamName.trim()}>Save</Button>
-          {teamSaveStatus === 'saved' && <span className="text-sm text-green-600">✓ Saved</span>}
+
+        <div className="bg-white border border-gray-200 rounded-xl p-6">
+          <h2 className="text-sm font-semibold text-gray-700 mb-4">Manager</h2>
+          <div className="space-y-4">
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Name</label>
+              <input
+                className={inputCls}
+                placeholder="Your full name"
+                value={manager.name}
+                onChange={(e) => { setManager((m) => ({ ...m, name: e.target.value })); setManagerSaveStatus('idle') }}
+              />
+              <p className="text-xs text-gray-400 mt-1">Used to filter direct reports in EOM and as supervisor in on-call reports.</p>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Email</label>
+              <input
+                className={inputCls}
+                placeholder="you@outsystems.com"
+                type="email"
+                value={manager.email}
+                onChange={(e) => { setManager((m) => ({ ...m, email: e.target.value })); setManagerSaveStatus('idle') }}
+              />
+              <p className="text-xs text-gray-400 mt-1">Used for Jira authentication.</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3 mt-4">
+            <Button size="sm" onClick={saveManager} disabled={managerSaveStatus === 'saving'}>
+              {managerSaveStatus === 'saving' ? 'Saving…' : 'Save'}
+            </Button>
+            {managerSaveStatus === 'saved' && <span className="text-sm text-green-600">✓ Saved</span>}
+            {managerSaveStatus === 'error' && <span className="text-sm text-red-600">Failed to save</span>}
+          </div>
         </div>
       </div>
 
@@ -219,10 +308,6 @@ export default function SettingsPage() {
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">Base URL</label>
               <input className={inputCls} placeholder="https://your-org.atlassian.net" value={fields.JIRA_BASE_URL} onChange={set('JIRA_BASE_URL')} />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Email</label>
-              <input className={inputCls} placeholder="you@company.com" type="email" value={fields.JIRA_EMAIL} onChange={set('JIRA_EMAIL')} />
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">
@@ -247,11 +332,6 @@ export default function SettingsPage() {
               <label className="block text-xs font-medium text-gray-600 mb-1">PM Project Key</label>
               <input className={inputCls} placeholder="e.g. PLAT, PM" value={fields.JIRA_PM_PROJECT_KEY} onChange={set('JIRA_PM_PROJECT_KEY')} />
               <p className="text-xs text-gray-400 mt-1">Project containing Value Milestones (for Roadmap page)</p>
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Jira Team ID</label>
-              <input className={inputCls} placeholder="e.g. d959f7e6-b222-4955-b5be-b6bdc698e10b-305" value={fields.jira_team_id} onChange={set('jira_team_id')} />
-              <p className="text-xs text-gray-400 mt-1">Used to filter Epics assigned to this team on the Roadmap page</p>
             </div>
           </div>
 
@@ -302,15 +382,6 @@ export default function SettingsPage() {
               />
               <p className="text-xs text-gray-400 mt-1">From the Rootly schedule edit page URL.</p>
             </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Department</label>
-              <input
-                className={inputCls}
-                placeholder="e.g. Web & Mobile"
-                value={rootly.oncall_department}
-                onChange={setRootlyField('oncall_department')}
-              />
-            </div>
           </div>
 
           <div className="flex items-center gap-3 mt-5">
@@ -323,15 +394,71 @@ export default function SettingsPage() {
         </div>
       </div>
 
-      <div className="bg-white border border-gray-200 rounded-xl p-6 max-w-lg">
-        <h2 className="text-sm font-semibold text-gray-700 mb-1">Sync Sprint Data</h2>
-        <p className="text-xs text-gray-400 mb-4">Pull the latest sprint and velocity data from Jira.</p>
-        <div className="flex items-center gap-3">
-          <Button size="sm" variant="secondary" onClick={sync} disabled={syncStatus === 'syncing'}>
-            {syncStatus === 'syncing' ? 'Syncing…' : 'Sync now'}
-          </Button>
-          {syncStatus === 'ok' && <span className="text-sm text-green-600">✓ {syncMsg}</span>}
-          {syncStatus === 'error' && <span className="text-sm text-red-600">{syncMsg}</span>}
+      <div className="grid grid-cols-2 gap-4 mb-4">
+        {/* EOM */}
+        <div className="bg-white border border-gray-200 rounded-xl p-6">
+          <div className="flex items-center gap-2.5 mb-1">
+            <div className="w-5 h-5 flex items-center justify-center rounded bg-indigo-600 text-white text-[9px] font-bold leading-none">OS</div>
+            <h2 className="text-sm font-semibold text-gray-700">EOM</h2>
+          </div>
+          <p className="text-xs text-gray-400 mb-5">
+            Sync team members from the Engineering Org Management directory. Token stored in{' '}
+            <code className="bg-gray-100 px-1 rounded">.env.local</code>, never committed.
+          </p>
+
+          <div className="space-y-4">
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">
+                API Token
+                <a href="https://apps.outsystems.app/EOM/TokenGeneration" target="_blank" rel="noreferrer" className="ml-2 font-normal text-indigo-500 hover:underline text-xs">
+                  Get one →
+                </a>
+              </label>
+              <input
+                className={inputCls}
+                type="password"
+                placeholder="Paste your EOM token"
+                value={eomToken}
+                onChange={(e) => { setEomToken(e.target.value); setHasEomToken(false); setEomTokenStatus('idle') }}
+              />
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 mt-5">
+            <Button size="sm" onClick={saveEomToken} disabled={eomTokenStatus === 'saving'}>
+              {eomTokenStatus === 'saving' ? 'Saving…' : 'Save'}
+            </Button>
+            {eomTokenStatus === 'saved' && <span className="text-sm text-green-600">✓ Saved</span>}
+            {eomTokenStatus === 'error' && <span className="text-sm text-red-600">Failed to save</span>}
+          </div>
+
+          <div className="border-t border-gray-100 pt-4 mt-5">
+            <div className="flex items-center gap-3">
+              <Button size="sm" variant="secondary" onClick={syncEom} disabled={eomSyncStatus === 'syncing'}>
+                {eomSyncStatus === 'syncing' ? 'Syncing…' : 'Sync from EOM'}
+              </Button>
+              {eomSyncStatus === 'ok' && <span className="text-sm text-green-600">✓ {eomSyncMsg}</span>}
+              {eomSyncStatus === 'error' && <span className="text-sm text-red-600">{eomSyncMsg}</span>}
+            </div>
+            {eomLastSynced && (
+              <p className="text-xs text-gray-400 mt-2">
+                Last synced {new Date(eomLastSynced).toLocaleString()}
+              </p>
+            )}
+          </div>
+        </div>
+
+        {/* Sync Sprint Data */}
+        <div className="bg-white border border-gray-200 rounded-xl p-6">
+          <h2 className="text-sm font-semibold text-gray-700 mb-1">Sync Sprint Data</h2>
+          <p className="text-xs text-gray-400 mb-4">Pull the latest sprint and velocity data from Jira.</p>
+          <div className="flex items-center gap-3">
+            <Button size="sm" variant="secondary" onClick={sync} disabled={syncStatus === 'syncing'}>
+              {syncStatus === 'syncing' ? 'Syncing…' : 'Sync now'}
+            </Button>
+            {syncStatus === 'ok' && <span className="text-sm text-green-600">✓ {syncMsg}</span>}
+            {syncStatus === 'error' && <span className="text-sm text-red-600">{syncMsg}</span>}
+          </div>
         </div>
       </div>
 

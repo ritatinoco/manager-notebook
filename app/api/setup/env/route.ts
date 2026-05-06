@@ -42,7 +42,6 @@ export async function GET() {
     ROOTLY_TOKEN: vars.ROOTLY_TOKEN ? '••••••••' : (process.env.ROOTLY_TOKEN ? '••••••••' : ''),
     hasRootlyToken: !!(vars.ROOTLY_TOKEN || process.env.ROOTLY_TOKEN),
     JIRA_PM_PROJECT_KEY: vars.JIRA_PM_PROJECT_KEY ?? process.env.JIRA_PM_PROJECT_KEY ?? '',
-    jira_team_id: config.jira_team_id ?? '',
     oncall_schedule_id: config.oncall_schedule_id ?? '',
     oncall_department: config.oncall_department ?? '',
     oncall_supervisor: config.oncall_supervisor ?? '',
@@ -69,16 +68,14 @@ export async function POST(req: NextRequest) {
 
   // Save per-team config fields
   const projectKey = body['JIRA_PROJECT_KEY']?.trim()
-  const teamId = body['jira_team_id']?.trim()
   const scheduleId = body['oncall_schedule_id']?.trim()
   const department = body['oncall_department']?.trim()
   const supervisor = body['oncall_supervisor']?.trim()
-  if (projectKey || teamId !== undefined || scheduleId !== undefined || department !== undefined || supervisor !== undefined) {
+  if (projectKey || scheduleId !== undefined || department !== undefined || supervisor !== undefined) {
     const config = getConfig()
     saveConfig({
       ...config,
       ...(projectKey ? { jira_project_key: projectKey } : {}),
-      ...(teamId !== undefined ? { jira_team_id: teamId } : {}),
       ...(scheduleId !== undefined ? { oncall_schedule_id: scheduleId } : {}),
       ...(department !== undefined ? { oncall_department: department } : {}),
       ...(supervisor !== undefined ? { oncall_supervisor: supervisor } : {}),
