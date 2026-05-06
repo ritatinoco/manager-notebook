@@ -1,5 +1,8 @@
 .claude/*
 *.local.md
-team-capacity/data/*
-!team-capacity/data/config.example.json
-me/*
+node_modules/
+.next/
+.env.local
+tsconfig.tsbuildinfo
+data/*
+!data/config.example.json

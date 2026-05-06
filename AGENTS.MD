@@ -1,99 +1,78 @@
-# AGENTS.md — Engineering Manager
+# AGENTS.md — Capacity Planner
 
-*This file tells Agents de how to work with your personal productivity system.*
-
----
-
-## About This Systems
-
-This is a management notebook to help managers with their day to day life while developing product. This can contain guidelines on evaluations, project management and tracking.
-
-> Workspace identity (owner, company, team, Jira keys) is in `memory/workspace.local.md` (not committed).
-> If that file is missing, run: *"Follow the instructions in BOOTSTRAP.md"*
+*This file tells agents how to work with this codebase.*
 
 ---
 
-## Vault Structure
+## About This App
 
+A sprint capacity planning tool for engineering managers. Pulls sprint data from Jira and computes team capacity, allocation targets, and velocity trends.
+
+Built with Next.js 14, TypeScript, and Tailwind CSS.
+
+> Jira connection details (project keys, board IDs) are in `memory/workspace.local.md` (not committed).
+
+---
+
+## Running the App
+
+```bash
+npm install
+npm run dev
 ```
-manager-notebook/
-├── README.md                    # How to use this system
-├── memory/                      # Accumulated patterns and insights (CRITICAL)
-├── templates/                   # Templates for Value Milestones, meetings, etc.
-├── me/                          # Manager context and personality
-└── team-capacity/               # Next.js app for team capacity planning and Jira integration
 
+Open [http://localhost:3000](http://localhost:3000).
+
+---
+
+## Jira Setup
+
+Create `.env.local` in the repo root:
+
+```env
+JIRA_BASE_URL=https://your-org.atlassian.net
+JIRA_EMAIL=your@email.com
+JIRA_API_TOKEN=your_api_token
 ```
 
 ---
 
-## Key Files to Always Reference
+## Project Structure
 
-When helping me, always read these files first:
-
-1. **memory/workspace.local.md** — Workspace identity: owner, company, team, Jira project keys (REQUIRED — do not proceed without this)
-2. **me/writing_style.md** — How I write (CRITICAL for any drafting tasks)
-3. **me/writing_samples.local.md** — Real writing examples (CRITICAL for any drafting tasks — read alongside writing_style.md)
+```
+app/           # Next.js pages and API routes
+components/    # UI components (nav/, ui/, velocity/)
+lib/           # Business logic
+  capacity/    # Capacity calculations
+  data/        # File-based data layer (config, absences, cache)
+  jira/        # Jira API client, sprint sync, roadmap
+  oncall/      # Rootly on-call integration
+data/          # Persisted data (gitignored except config.example.json)
+docs/          # Screenshots
+memory/        # workspace.local.md — Jira keys (not committed)
+```
 
 ---
 
-## Common Commands
+## Key Files
 
-### Get Atlassian information
-
-**Get Issues assigned to me close to the end date**
-```
-Check the which issues are assigned to be in JIRA 
-```
-
-
-### Writing Tasks
-
-**Draft any message/document:**
-
-```
-Read writing_style.md first.
-Draft a [email/slack message/document] to [audience] about [topic].
-Match my voice exactly. No AI smell.
-```
-
-**Review something I wrote:**
-
-```
-Read writing_style.md.
-Review this draft and flag anything that doesn't sound like me.
-Suggest edits that match my voice.
-```
-
+| File | Purpose |
+|------|---------|
+| `lib/jira/client.ts` | Jira API client |
+| `lib/jira/sprints.ts` | Sprint sync logic |
+| `lib/capacity/calculations.ts` | Capacity and SP calculations |
+| `lib/holidays.ts` | Portuguese public holidays |
+| `data/config.example.json` | Team config schema reference |
+| `memory/workspace.local.md` | Jira project keys (gitignored) |
 
 ---
 
-## When Helping Me
+## Data Model
 
-**DO:**
-
-- **Read writing_style.md BEFORE any drafting task** — match my voice exactly
-- Be direct and concise — I prefer clarity over softness
-- Use executive-level language, not therapy-speak
-- When drafting: shorter is better, avoid AI-sounding phrases
-
-**DON'T:**
-
-- Add productivity theater or unnecessary structure
-- Be overly positive — I want honest assessment
-- Create new files without checking if similar exists
-- Use words from my "avoid" list in writing_style.md
-- Sound like ChatGPT default output (too polished, too many transitions)
-- Add pleasantries or filler phrases I wouldn't use
+- `data/config.json` — team members, SP/day rates, allocation percentages (gitignored)
+- `data/absences.json` — days off per member per sprint (gitignored)
+- `data/jira-cache.json` — cached sprint data from Jira (gitignored)
 
 ---
 
-## My Preferences
-
-- **Tone:** Calm, direct, executive-level, quirky, nerdy
-- **Format:** Minimal formatting, no excessive headers or bullets
-- **1:1s:** I meet by-weekly with direct reports
-
----
-
-*Last updated: 2026-04-21*
+*Last updated: 2026-05-06*
