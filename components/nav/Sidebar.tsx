@@ -20,6 +20,7 @@ import {
   Rows,
   SquaresFour,
   CaretDown,
+  NotePencil,
 } from '@phosphor-icons/react'
 
 type NavChild = { href: string; label: string; Icon: React.ElementType }
@@ -44,6 +45,7 @@ const sections: NavSection[] = [
       },
       { href: '/velocity', label: 'Velocity', Icon: TrendUp },
       { href: '/sprint-goals', label: 'Sprint Goals', Icon: ClipboardTextIcon },
+      { href: '/notes', label: 'Notes', Icon: NotePencil },
     ],
   },
   {
