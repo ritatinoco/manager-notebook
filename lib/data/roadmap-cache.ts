@@ -13,6 +13,13 @@ export interface EpicCache {
   targetStart: string | null
   targetEnd: string | null
   resolvedAt: string | null
+  recentUpdate: string | null
+}
+
+export interface VMAssignee {
+  accountId: string
+  displayName: string
+  avatarUrl: string | null
 }
 
 export interface VMCache {
@@ -22,7 +29,9 @@ export interface VMCache {
   targetStart: string | null
   targetEnd: string | null
   recentUpdate: string | null
+  detailedStatus: string | null
   resolvedAt: string | null
+  assignee: VMAssignee | null
   epics: EpicCache[]
 }
 

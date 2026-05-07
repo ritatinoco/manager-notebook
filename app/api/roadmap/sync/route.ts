@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { fetchTeamEpics, fetchVMsByKeys, fetchInitiativesByKeys, fetchDevelopmentStartDate, fetchValueStreamFieldId } from '@/lib/jira/roadmap'
+import { fetchTeamEpics, fetchVMsByKeys, fetchInitiativesByKeys, fetchDevelopmentStartDate, fetchValueStreamFieldId, fetchDetailedStatusFieldId } from '@/lib/jira/roadmap'
 import { saveRoadmapCache } from '@/lib/data/roadmap-cache'
 import { getActiveTeam } from '@/lib/data/teams'
 
@@ -20,9 +20,11 @@ export async function POST() {
     // 1. Fetch epics assigned to this team
     const epics = await fetchTeamEpics(team.name)
 
-    // 2. Fetch VMs by parent keys from epics
+    // 2. Fetch VMs by parent keys from epics (discover Detailed Status field in parallel)
     const vmKeys = [...new Set(epics.map((e) => e.parentKey).filter(Boolean) as string[])]
-    const vmsRaw = await fetchVMsByKeys(vmKeys)
+    const [vmsRaw] = await Promise.all([
+      fetchDetailedStatusFieldId().then((dsFieldId) => fetchVMsByKeys(vmKeys, dsFieldId)),
+    ])
 
     // 3. Filtering helpers
     const cutoff = Date.now() - 90 * 24 * 60 * 60 * 1000
@@ -61,7 +63,9 @@ export async function POST() {
         targetStart: vm.targetStart,
         targetEnd: vm.targetEnd,
         recentUpdate: vm.recentUpdate,
+        detailedStatus: vm.detailedStatus ?? null,
         resolvedAt: vm.resolvedAt,
+        assignee: vm.assignee ?? null,
         parentKey: vm.parentKey,
         epics: (epicsByVM.get(vm.key) ?? [])
           .filter((e) => isVisible(e.status, e.resolvedAt, e.targetEnd) && e.status.toLowerCase() !== 'cancelled')
@@ -120,7 +124,7 @@ export async function POST() {
     if (orphanEpicsActive.length > 0) {
       orphanVMsRaw.push({
         key: '', summary: 'No Value Milestone', status: '',
-        targetStart: null, targetEnd: null, recentUpdate: null, resolvedAt: null,
+        targetStart: null, targetEnd: null, recentUpdate: null, detailedStatus: null, resolvedAt: null, assignee: null,
         epics: orphanEpicsActive.map(({ parentKey: _pk, ...rest }) => rest),
       })
     }

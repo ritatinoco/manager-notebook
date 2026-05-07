@@ -1,9 +1,9 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import type { InitiativeCache, VMCache } from '@/lib/data/roadmap-cache'
+import type { InitiativeCache, VMCache, EpicCache, VMAssignee } from '@/lib/data/roadmap-cache'
 import type { ValueStreamConfig } from '@/lib/data/value-streams'
-import { ArrowsClockwise, Rocket, Diamond, GearSix } from '@phosphor-icons/react'
+import { ArrowsClockwise, Rocket, Diamond, GearSix, PencilSimple, Check, X, Article } from '@phosphor-icons/react'
 
 function fmtDate(iso: string | null | undefined): string {
   if (!iso) return '—'
@@ -27,18 +27,26 @@ const STATUS_STYLES: Record<string, string> = {
 }
 
 const ACTIVE_ORDER = ['Solution Design', 'Planning Preparation', 'Ready for Planning', 'Ready for Development', 'In Design', 'Development', 'In Progress']
-const DONE_STATUSES = new Set(['Done', 'GA', 'Releasing'])
+const DONE_STATUSES = new Set(['Done', 'GA'])
 const DEFINITION_KEYWORDS = ['definition', 'ideation', 'discovery']
 const PAUSED_KEYWORDS = ['paused', 'on hold', 'blocked']
 
 const DEFAULT_COLORS = ['#6366f1', '#f59e0b', '#10b981', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#f97316', '#84cc16', '#14b8a6']
 
-type IniGroup = 'active' | 'definition' | 'paused'
+type IniGroup = 'active' | 'definition' | 'paused' | 'done'
 
 function classifyInitiative(ini: InitiativeCache): IniGroup {
   const s = ini.status.toLowerCase()
   if (PAUSED_KEYWORDS.some((k) => s.includes(k))) return 'paused'
+  if (DONE_STATUSES.has(ini.status)) return 'done'
   if (DEFINITION_KEYWORDS.some((k) => s.includes(k))) return 'definition'
+  // If the initiative is active but ALL team VMs are in a definition state → In Definition tab
+  if (ini.vms.length > 0) {
+    const allInDefinition = ini.vms.every((vm) =>
+      DEFINITION_KEYWORDS.some((k) => vm.status.toLowerCase().includes(k))
+    )
+    if (allInDefinition) return 'definition'
+  }
   return 'active'
 }
 
@@ -77,15 +85,171 @@ function VSBadge({ name, color }: { name: string; color: string }) {
   )
 }
 
-function VMSection({ vm, jiraBaseUrl }: { vm: VMCache; jiraBaseUrl: string }) {
+function DetailedStatusModal({ summary, content, onClose }: { summary: string; content: string; onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="absolute inset-0 bg-black/30" />
+      <div className="relative bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[80vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+          <div>
+            <p className="text-xs text-gray-400 font-mono mb-0.5">Detailed Status</p>
+            <p className="text-sm font-semibold text-gray-800">{summary}</p>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors">
+            <X size={18} weight="bold" />
+          </button>
+        </div>
+        <div className="overflow-y-auto px-5 py-4">
+          <pre className="text-xs text-gray-700 leading-relaxed whitespace-pre-wrap font-sans">{content}</pre>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function AssigneeChip({ assignee }: { assignee: VMAssignee }) {
+  const initials = assignee.displayName.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase()
+  const parts = assignee.displayName.split(' ')
+  const shortName = parts.length >= 2 ? `${parts[0]} ${parts[parts.length - 1][0]}.` : parts[0]
+  return (
+    <div className="flex items-center gap-1.5 shrink-0">
+      {assignee.avatarUrl ? (
+        <img src={assignee.avatarUrl} alt={assignee.displayName}
+          className="w-5 h-5 rounded-full shrink-0 object-cover" />
+      ) : (
+        <span className="w-5 h-5 rounded-full bg-indigo-100 text-indigo-700 text-[9px] font-bold flex items-center justify-center shrink-0">
+          {initials}
+        </span>
+      )}
+      <span className="text-xs text-gray-500">{shortName}</span>
+    </div>
+  )
+}
+
+function EpicRow({ epic, jiraBaseUrl, onUpdate }: {
+  epic: EpicCache; jiraBaseUrl: string; onUpdate: (key: string, value: string) => void
+}) {
+  const [editing, setEditing] = useState(false)
+  const [editValue, setEditValue] = useState('')
+  const [saving, setSaving] = useState(false)
+  const epicHref = jiraBaseUrl ? `${jiraBaseUrl}/browse/${epic.key}` : null
+
+  async function save() {
+    setSaving(true)
+    try {
+      const res = await fetch('/api/roadmap/update-vm', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key: epic.key, recentUpdate: editValue }),
+      })
+      if (res.ok) { onUpdate(epic.key, editValue); setEditing(false) }
+    } finally { setSaving(false) }
+  }
+
+  return (
+    <div className="border-t border-gray-50 ml-4">
+      <div className="flex items-center gap-3 px-5 py-2 hover:bg-gray-50">
+        <span className="text-gray-200 text-xs ml-4">└</span>
+        {epicHref ? (
+          <a href={epicHref} target="_blank" rel="noopener noreferrer"
+            className="text-xs font-mono text-gray-400 shrink-0 hover:text-indigo-600 hover:underline">
+            {epic.key}
+          </a>
+        ) : (
+          <span className="text-xs font-mono text-gray-400 shrink-0">{epic.key}</span>
+        )}
+        <span className="text-sm text-gray-600 flex-1 min-w-0 truncate">{epic.summary}</span>
+        <StatusBadge status={epic.status} />
+        {(epic.targetStart || epic.targetEnd) && (
+          <span className="text-xs text-gray-400 shrink-0">{fmtDate(epic.targetStart)} → {fmtDate(epic.targetEnd)}</span>
+        )}
+      </div>
+
+      <div className="mx-5 mb-2 ml-16">
+        {editing ? (
+          <div className="flex flex-col gap-1.5">
+            <textarea
+              autoFocus
+              value={editValue}
+              onChange={(e) => setEditValue(e.target.value)}
+              rows={2}
+              className="w-full text-xs text-gray-700 bg-white border border-amber-300 rounded px-3 py-2 resize-none focus:outline-none focus:ring-1 focus:ring-amber-400"
+              placeholder="Enter status update…"
+            />
+            <div className="flex items-center gap-2">
+              <button onClick={save} disabled={saving}
+                className="flex items-center gap-1 text-xs bg-amber-500 text-white rounded px-2.5 py-1 hover:bg-amber-600 disabled:opacity-50 transition-colors">
+                <Check size={11} weight="bold" />{saving ? 'Saving…' : 'Save'}
+              </button>
+              <button onClick={() => setEditing(false)}
+                className="flex items-center gap-1 text-xs text-gray-500 border border-gray-300 rounded px-2.5 py-1 hover:bg-gray-50 transition-colors">
+                <X size={11} weight="bold" />Cancel
+              </button>
+            </div>
+          </div>
+        ) : epic.recentUpdate ? (
+          <div className="group flex items-start gap-2 px-3 py-1.5 bg-amber-50 border-l-2 border-amber-200 rounded-r text-xs text-gray-500 leading-relaxed">
+            <span className="flex-1">
+              <span className="font-medium text-amber-600 mr-1.5">Status update:</span>
+              {epic.recentUpdate}
+            </span>
+            <button onClick={() => { setEditValue(epic.recentUpdate ?? ''); setEditing(true) }}
+              className="opacity-0 group-hover:opacity-100 text-amber-400 hover:text-amber-600 transition-opacity shrink-0 mt-0.5">
+              <PencilSimple size={12} weight="bold" />
+            </button>
+          </div>
+        ) : (
+          <button onClick={() => { setEditValue(''); setEditing(true) }}
+            className="text-xs text-gray-400 hover:text-amber-600 transition-colors flex items-center gap-1 py-0.5">
+            <PencilSimple size={11} />Add status update
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function VMSection({ vm, jiraBaseUrl, currentUserAccountId, onUpdateRecentUpdate }: {
+  vm: VMCache
+  jiraBaseUrl: string
+  currentUserAccountId: string | null
+  onUpdateRecentUpdate: (key: string, value: string) => void
+}) {
   const [open, setOpen] = useState(true)
+  const [editing, setEditing] = useState(false)
+  const [editValue, setEditValue] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [showDetailedStatus, setShowDetailedStatus] = useState(false)
   const vmHref = jiraBaseUrl && vm.key ? `${jiraBaseUrl}/browse/${vm.key}` : null
+  const canEdit = currentUserAccountId != null && vm.assignee?.accountId === currentUserAccountId
+
+  function startEdit() {
+    setEditValue(vm.recentUpdate ?? '')
+    setEditing(true)
+  }
+
+  async function save() {
+    setSaving(true)
+    try {
+      const res = await fetch('/api/roadmap/update-vm', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key: vm.key, recentUpdate: editValue }),
+      })
+      if (res.ok) {
+        onUpdateRecentUpdate(vm.key, editValue)
+        setEditing(false)
+      }
+    } finally {
+      setSaving(false)
+    }
+  }
 
   return (
     <div className="border-t border-gray-100">
-      <button
+      <div
         onClick={() => setOpen((o) => !o)}
-        className="w-full flex items-center gap-3 px-5 py-2.5 hover:bg-gray-50 transition-colors text-left"
+        className="w-full flex items-center gap-3 px-5 py-2.5 hover:bg-gray-50 transition-colors cursor-pointer"
       >
         <span className="text-gray-300 text-xs ml-2">{open ? '▾' : '▸'}</span>
         <Diamond size={12} weight="duotone" className="text-indigo-400 shrink-0" />
@@ -98,44 +262,98 @@ function VMSection({ vm, jiraBaseUrl }: { vm: VMCache; jiraBaseUrl: string }) {
           <span className="text-xs font-mono text-gray-400 shrink-0">{vm.key}</span>
         ) : null}
         <span className="text-sm font-medium text-gray-700 flex-1 min-w-0 truncate">{vm.summary}</span>
+        {vm.detailedStatus && (
+          <button
+            onClick={(e) => { e.stopPropagation(); setShowDetailedStatus(true) }}
+            className="text-gray-300 hover:text-indigo-500 transition-colors shrink-0"
+            title="View detailed status"
+          >
+            <Article size={15} weight="duotone" />
+          </button>
+        )}
+        {vm.assignee && <AssigneeChip assignee={vm.assignee} />}
         {vm.status && <StatusBadge status={vm.status} />}
         {(vm.targetStart || vm.targetEnd) && (
           <span className="text-xs text-gray-400 shrink-0">{fmtDate(vm.targetStart)} → {fmtDate(vm.targetEnd)}</span>
         )}
-      </button>
+      </div>
+
+      <div className="mx-5 mb-2 ml-14">
+        {editing ? (
+          <div className="flex flex-col gap-1.5">
+            <textarea
+              autoFocus
+              value={editValue}
+              onChange={(e) => setEditValue(e.target.value)}
+              rows={3}
+              className="w-full text-xs text-gray-700 bg-white border border-amber-300 rounded px-3 py-2 resize-none focus:outline-none focus:ring-1 focus:ring-amber-400"
+              placeholder="Enter status update…"
+            />
+            <div className="flex items-center gap-2">
+              <button
+                onClick={save}
+                disabled={saving}
+                className="flex items-center gap-1 text-xs bg-amber-500 text-white rounded px-2.5 py-1 hover:bg-amber-600 disabled:opacity-50 transition-colors"
+              >
+                <Check size={11} weight="bold" />
+                {saving ? 'Saving…' : 'Save'}
+              </button>
+              <button
+                onClick={() => setEditing(false)}
+                className="flex items-center gap-1 text-xs text-gray-500 border border-gray-300 rounded px-2.5 py-1 hover:bg-gray-50 transition-colors"
+              >
+                <X size={11} weight="bold" />
+                Cancel
+              </button>
+            </div>
+          </div>
+        ) : vm.recentUpdate ? (
+          <div className="group flex items-start gap-2 px-3 py-2 bg-amber-50 border-l-2 border-amber-300 rounded-r text-xs text-gray-600 leading-relaxed">
+            <span className="flex-1">
+              <span className="font-medium text-amber-700 mr-1.5">Status update:</span>
+              {vm.recentUpdate}
+            </span>
+            {canEdit && (
+              <button onClick={startEdit} className="opacity-0 group-hover:opacity-100 text-amber-400 hover:text-amber-600 transition-opacity shrink-0 mt-0.5">
+                <PencilSimple size={12} weight="bold" />
+              </button>
+            )}
+          </div>
+        ) : canEdit ? (
+          <button
+            onClick={startEdit}
+            className="text-xs text-gray-400 hover:text-amber-600 transition-colors flex items-center gap-1 py-0.5"
+          >
+            <PencilSimple size={11} />
+            Add status update
+          </button>
+        ) : null}
+      </div>
+
       {open && vm.epics.length > 0 && (
         <div>
-          {vm.epics.map((epic) => {
-            const epicHref = jiraBaseUrl ? `${jiraBaseUrl}/browse/${epic.key}` : null
-            return (
-              <div key={epic.key} className="flex items-center gap-3 px-5 py-2 border-t border-gray-50 hover:bg-gray-50 ml-4">
-                <span className="text-gray-200 text-xs ml-4">└</span>
-                {epicHref ? (
-                  <a href={epicHref} target="_blank" rel="noopener noreferrer"
-                    className="text-xs font-mono text-gray-400 shrink-0 hover:text-indigo-600 hover:underline">
-                    {epic.key}
-                  </a>
-                ) : (
-                  <span className="text-xs font-mono text-gray-400 shrink-0">{epic.key}</span>
-                )}
-                <span className="text-sm text-gray-600 flex-1 min-w-0 truncate">{epic.summary}</span>
-                <StatusBadge status={epic.status} />
-                {(epic.targetStart || epic.targetEnd) && (
-                  <span className="text-xs text-gray-400 shrink-0">{fmtDate(epic.targetStart)} → {fmtDate(epic.targetEnd)}</span>
-                )}
-              </div>
-            )
-          })}
+          {vm.epics.map((epic) => (
+            <EpicRow key={epic.key} epic={epic} jiraBaseUrl={jiraBaseUrl} onUpdate={onUpdateRecentUpdate} />
+          ))}
         </div>
+      )}
+      {showDetailedStatus && vm.detailedStatus && (
+        <DetailedStatusModal
+          summary={vm.summary}
+          content={vm.detailedStatus}
+          onClose={() => setShowDetailedStatus(false)}
+        />
       )}
     </div>
   )
 }
 
 function InitiativeRow({
-  ini, jiraBaseUrl, vsName, vsColor,
+  ini, jiraBaseUrl, vsName, vsColor, currentUserAccountId, onUpdateRecentUpdate,
 }: {
   ini: InitiativeCache; jiraBaseUrl: string; vsName: string | null; vsColor: string | null
+  currentUserAccountId: string | null
+  onUpdateRecentUpdate: (key: string, value: string) => void
 }) {
   const [open, setOpen] = useState(true)
   const href = jiraBaseUrl && ini.key ? `${jiraBaseUrl}/browse/${ini.key}` : null
@@ -171,7 +389,7 @@ function InitiativeRow({
       {open && ini.vms.length > 0 && (
         <div>
           {ini.vms.map((vm) => (
-            <VMSection key={vm.key || vm.summary} vm={vm} jiraBaseUrl={jiraBaseUrl} />
+            <VMSection key={vm.key || vm.summary} vm={vm} jiraBaseUrl={jiraBaseUrl} currentUserAccountId={currentUserAccountId} onUpdateRecentUpdate={onUpdateRecentUpdate} />
           ))}
         </div>
       )}
@@ -237,6 +455,7 @@ export default function RoadmapPage() {
   const [orphanVMs, setOrphanVMs] = useState<VMCache[]>([])
   const [syncedAt, setSyncedAt] = useState<string | null>(null)
   const [jiraBaseUrl, setJiraBaseUrl] = useState('')
+  const [currentUserAccountId, setCurrentUserAccountId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [syncing, setSyncing] = useState(false)
   const [syncError, setSyncError] = useState('')
@@ -245,7 +464,7 @@ export default function RoadmapPage() {
   const [vsConfig, setVsConfig] = useState<ValueStreamConfig>({ streams: [], assignments: {} })
   const [vsSaving, setVsSaving] = useState(false)
 
-  type Tab = 'active' | 'definition' | 'paused'
+  type Tab = 'active' | 'definition' | 'paused' | 'done'
   const [activeTab, setActiveTab] = useState<Tab>('active')
 
   function load() {
@@ -254,6 +473,7 @@ export default function RoadmapPage() {
       setOrphanVMs(d.orphanVMs ?? [])
       setSyncedAt(d.syncedAt)
       setJiraBaseUrl(d.jiraBaseUrl ?? '')
+      setCurrentUserAccountId(d.currentUser?.accountId ?? null)
     }).finally(() => setLoading(false))
   }
 
@@ -272,6 +492,27 @@ export default function RoadmapPage() {
       body: JSON.stringify(config),
     })
     setVsSaving(false)
+  }
+
+  function handleUpdateRecentUpdate(key: string, value: string) {
+    const updated = value || null
+    setInitiatives((prev) =>
+      prev.map((ini) => ({
+        ...ini,
+        vms: ini.vms.map((vm) =>
+          vm.key === key
+            ? { ...vm, recentUpdate: updated }
+            : { ...vm, epics: vm.epics.map((e) => e.key === key ? { ...e, recentUpdate: updated } : e) }
+        ),
+      }))
+    )
+    setOrphanVMs((prev) =>
+      prev.map((vm) =>
+        vm.key === key
+          ? { ...vm, recentUpdate: updated }
+          : { ...vm, epics: vm.epics.map((e) => e.key === key ? { ...e, recentUpdate: updated } : e) }
+      )
+    )
   }
 
   async function refresh() {
@@ -296,21 +537,68 @@ export default function RoadmapPage() {
       ?? DEFAULT_COLORS[idx % DEFAULT_COLORS.length]
   }
 
-  // Wrap orphan VMs in a synthetic initiative for display
-  const orphanInitiative: InitiativeCache = {
-    key: '', summary: 'No Initiative', status: '', targetStart: null, targetEnd: null, resolvedAt: null,
-    vms: orphanVMs,
+  function isPausedVM(vm: VMCache) {
+    return PAUSED_KEYWORDS.some((k) => vm.status.toLowerCase().includes(k))
   }
-  const allInitiatives = orphanVMs.length > 0 ? [...initiatives, orphanInitiative] : initiatives
 
-  const activeInis = sortActive(allInitiatives.filter((i) => classifyInitiative(i) === 'active'))
-  const definitionInis = allInitiatives.filter((i) => classifyInitiative(i) === 'definition')
-  const pausedInis = allInitiatives.filter((i) => classifyInitiative(i) === 'paused')
+  // Wrap orphan VMs in synthetic initiatives split by paused state
+  const activeOrphanVMs = orphanVMs.filter((vm) => !isPausedVM(vm))
+  const pausedOrphanVMs = orphanVMs.filter((vm) => isPausedVM(vm))
+
+  const orphanActive: InitiativeCache = {
+    key: '', summary: 'No Initiative', status: '', targetStart: null, targetEnd: null, resolvedAt: null, valueStream: null,
+    vms: activeOrphanVMs,
+  }
+  const orphanPaused: InitiativeCache = {
+    key: '__orphan_paused__', summary: 'No Initiative', status: 'Paused', targetStart: null, targetEnd: null, resolvedAt: null, valueStream: null,
+    vms: pausedOrphanVMs,
+  }
+
+  const allInitiatives = [
+    ...initiatives,
+    ...(activeOrphanVMs.length > 0 ? [orphanActive] : []),
+    ...(pausedOrphanVMs.length > 0 ? [orphanPaused] : []),
+  ]
+
+  function isDone(status: string) { return DONE_STATUSES.has(status) }
+
+  // Strip done VMs, done epics, and VMs left with no visible epics for non-done tabs
+  function withoutDone(ini: InitiativeCache): InitiativeCache {
+    return {
+      ...ini,
+      vms: ini.vms
+        .filter((vm) => !isDone(vm.status))
+        .map((vm) => ({ ...vm, epics: vm.epics.filter((e) => !isDone(e.status)) }))
+        .filter((vm) => vm.epics.length > 0),
+    }
+  }
+
+  // Build Done tab: Done-classified initiatives with VMs + active initiatives with done VMs/epics
+  const doneTabInis: InitiativeCache[] = allInitiatives
+    .map((ini) => {
+      const iniIsDone = classifyInitiative(ini) === 'done'
+      const doneVMs = ini.vms.filter((vm) => isDone(vm.status))
+      const activeVMsWithDoneEpics = ini.vms
+        .filter((vm) => !isDone(vm.status))
+        .map((vm) => ({ ...vm, epics: vm.epics.filter((e) => isDone(e.status)) }))
+        .filter((vm) => vm.epics.length > 0)
+      const combined = iniIsDone ? ini.vms : [...doneVMs, ...activeVMsWithDoneEpics]
+      // Skip if nothing to show
+      if (combined.length === 0) return null
+      return { ...ini, vms: combined }
+    })
+    .filter(Boolean) as InitiativeCache[]
+
+  const nonDoneInis = allInitiatives.map(withoutDone)
+  const activeInis = sortActive(nonDoneInis.filter((i) => classifyInitiative(i) === 'active' && (i.vms.length > 0 || i.key)))
+  const definitionInis = nonDoneInis.filter((i) => classifyInitiative(i) === 'definition')
+  const pausedInis = nonDoneInis.filter((i) => classifyInitiative(i) === 'paused')
 
   const tabs: { id: Tab; label: string; items: InitiativeCache[] }[] = [
     { id: 'active', label: 'Active', items: activeInis },
     { id: 'definition', label: 'In Definition', items: definitionInis },
     { id: 'paused', label: 'Paused', items: pausedInis },
+    { id: 'done', label: 'Done', items: doneTabInis },
   ]
   const visibleItems = tabs.find((t) => t.id === activeTab)?.items ?? []
 
@@ -388,6 +676,8 @@ export default function RoadmapPage() {
                 jiraBaseUrl={jiraBaseUrl}
                 vsName={ini.valueStream ?? null}
                 vsColor={vsColorFor(ini.valueStream ?? null)}
+                currentUserAccountId={currentUserAccountId}
+                onUpdateRecentUpdate={handleUpdateRecentUpdate}
               />
             ))}
             {visibleItems.length === 0 && <p className="text-sm text-gray-400 py-4">No items in this category.</p>}
