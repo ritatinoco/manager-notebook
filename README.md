@@ -25,6 +25,8 @@ The app is organised around the engineering manager's recurring rhythm. Each sec
 | [On-Call](#on-call----oncall) | On-call shifts from Rootly |
 | [Team](#team----team) | Team member config and SP/day rates |
 | [Allocation](#allocation----allocation) | Tune the % split between work categories |
+| [Features](#features----snowflakefeatures) | Track feature adoption metrics from Snowflake |
+| [Query](#query----snowflakequery) | Run ad-hoc SQL queries against Snowflake |
 | [Settings](#settings----settings) | Configure integrations and run syncs |
 
 ---
@@ -162,6 +164,30 @@ Set `ROOTLY_API_KEY` in `.env.local` and configure the schedule ID in Settings t
 - Re-balance allocation at the start of a new quarter.
 - Temporarily shift more % into debts during a stabilisation push and see suggested SP update everywhere.
 
+### Features — `/snowflake/features`
+
+**Purpose.** Track adoption and usage metrics for specific product features, powered by Snowflake queries.
+
+**Use cases.**
+- Create a feature config with a name, description, and one or more SQL queries — each query becomes a chart.
+- Choose between line charts (for time-series data) and pie charts (for distribution data, shown with percentages).
+- Assign a Snowflake connection profile per feature so each feature queries the right database and warehouse.
+- Charts load automatically when you select a feature.
+
+**Connection profiles** are configured in Settings → Snowflake Connections. Each profile has a name, database, warehouse, and optional schema. You can define multiple profiles and switch between them per feature or per ad-hoc query.
+
+**Authentication.** Uses a Programmatic Access Token (PAT). If you see a "Network policy is required" error, go to [Snowflake](https://app.snowflake.com) → your avatar → Profile → Authentication → Programmatic access tokens, click **…** on your token, and choose **Bypass requirement for network policy**.
+
+### Query — `/snowflake/query`
+
+**Purpose.** Run ad-hoc SQL queries against Snowflake and see results in a table.
+
+**Use cases.**
+- Explore data before turning a query into a feature chart.
+- Run one-off queries without leaving the app.
+- Select which connection profile to use from the dropdown at the top.
+- Run with the **Run** button or ⌘+Enter.
+
 ### Settings — `/settings`
 
 **Purpose.** Configure integrations and run syncs.
@@ -170,6 +196,7 @@ Set `ROOTLY_API_KEY` in `.env.local` and configure the schedule ID in Settings t
 - Set your Jira project key, Rootly API key, and other credentials.
 - Run individual syncs (Jira sprint data, Jira roadmap, on-call shifts).
 - See last-synced timestamp per source.
+- Configure Snowflake credentials (account, API token) and manage named connection profiles (database, warehouse, schema).
 
 ### Multi-team
 
@@ -216,5 +243,7 @@ Computed from closed sprints in the selected quarter only. Active and future spr
 | `data/teams/{id}/sprint-comments.json` | Manager notes per sprint |
 | `data/teams.json` | List of all teams |
 | `data/active-team.json` | Currently active team ID |
+| `data/snowflake-features.json` | Saved feature configs (name, description, SQL charts) |
+| `data/snowflake-connections.json` | Named Snowflake connection profiles |
 
 See `data/config.example.json` for the config schema. All data files are gitignored.

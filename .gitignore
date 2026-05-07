@@ -6,3 +6,4 @@ node_modules/
 tsconfig.tsbuildinfo
 data/*
 !data/config.example.json
+snowflake.log

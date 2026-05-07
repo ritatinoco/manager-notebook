@@ -1,11 +1,11 @@
 # Capacity Planner Architecture
 
 > **Repository:** manager-notebook
-> **Last Updated:** 2026-05-06
+> **Last Updated:** 2026-05-07
 
 ## Overview
 
-A locally-hosted Next.js app that pulls sprint data from Jira and on-call shifts from Rootly, then computes team capacity and story-point allocations. All external data is cached to local JSON files; the browser UI reads only from that cache.
+A locally-hosted Next.js app that pulls sprint data from Jira and on-call shifts from Rootly, then computes team capacity and story-point allocations. Also connects to Snowflake for live feature analytics queries. All Jira/Rootly data is cached to local JSON files; Snowflake is queried on demand.
 
 > **Runtime Environment:** Next.js server running on the developer's local machine (`localhost:3000`)
 
@@ -19,10 +19,12 @@ graph TB
 
     Jira["Jira Cloud REST API<br/>EXTERNAL"]
     Rootly["Rootly On-Call API<br/>api.rootly.com<br/>EXTERNAL"]
+    Snowflake["Snowflake<br/>*.snowflakecomputing.com<br/>EXTERNAL"]
     FS[("Local Filesystem<br/>data/teams/{id}/*.json<br/>EXTERNAL")]
 
     App -->|"HTTP Basic Auth<br/>Sync endpoints only"| Jira
     App -->|"Bearer token<br/>Sync endpoints only"| Rootly
+    App -->|"PAT (snowflake-sdk)<br/>On demand per query"| Snowflake
     App -->|"Read / write JSON files<br/>All endpoints"| FS
 
     classDef thisRepo fill:#e0f2f1,stroke:#00796b,stroke-width:3px
@@ -30,7 +32,7 @@ graph TB
     classDef database fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
 
     class App thisRepo
-    class Jira,Rootly external
+    class Jira,Rootly,Snowflake external
     class FS database
 ```
 
@@ -42,6 +44,7 @@ graph TB
 |-----------------|------|---------|
 | Jira Cloud REST API | Basic Auth (email + API token) | Sprint velocity, story points, roadmap, sprint goals |
 | Rootly On-Call API (`api.rootly.com`) | Bearer token | On-call shifts and schedules |
+| Snowflake (`*.snowflakecomputing.com`) | Programmatic Access Token via `snowflake-sdk` | Live feature analytics queries |
 | Local filesystem (`data/`) | — | Persist and read cached data between syncs |
 
 ---
@@ -60,9 +63,9 @@ After each sync, all UI reads are served from the local JSON cache with no furth
 
 ## Architectural Tenets
 
-### T1. External syncs write to disk; all reads serve from cache
+### T1. External syncs write to disk; all reads serve from cache (except Snowflake)
 
-The app never calls Jira or Rootly from GET endpoints or from the browser. External HTTP calls happen exclusively in dedicated sync endpoints (`POST /api/jira/sync`, `POST /api/roadmap/sync`), and results are serialised to JSON files under `data/teams/{id}/`. Every other API route reads only from those files.
+The app never calls Jira or Rootly from GET endpoints or from the browser. Snowflake is the exception to this tenet — it is queried live on demand because it serves as an analytics engine where caching results would make the data stale. Snowflake queries are always initiated by explicit user action (running a query or loading a feature page). External HTTP calls happen exclusively in dedicated sync endpoints (`POST /api/jira/sync`, `POST /api/roadmap/sync`), and results are serialised to JSON files under `data/teams/{id}/`. Every other API route reads only from those files.
 
 **Evidence:**
 - [`app/api/jira/sync/route.ts`](app/api/jira/sync/route.ts) — calls `jiraFetch`, then `saveJiraCache`; no external calls in any GET route
@@ -83,6 +86,7 @@ Direct HTTP calls to external APIs must not appear in API route handlers or busi
 **Evidence:**
 - [`lib/jira/client.ts`](lib/jira/client.ts) — owns `JIRA_BASE_URL`, Basic Auth header, `jiraFetch` / `jiraPost` / `jiraPut`
 - [`lib/oncall/rootly.ts`](lib/oncall/rootly.ts) — owns Rootly API calls for schedules and shifts
+- [`lib/snowflake/client.ts`](lib/snowflake/client.ts) — owns Snowflake connection setup and `runQuery`; route handlers never call `snowflake-sdk` directly
 
 ### T4. The filesystem is the only persistence layer
 
@@ -124,6 +128,9 @@ app/                  Pages and API routes (Next.js App Router)
   vm-timeline/        Timeline view of value milestones
   gantt/              Gantt chart view
   oncall/             On-call schedule
+  snowflake/
+    features/         Feature analytics (saved feature configs + charts)
+    query/            Ad-hoc Snowflake query runner
   settings/           App settings
   setup/              First-time setup flow
 
@@ -151,11 +158,15 @@ lib/
     roadmap.ts        Value Milestone queries
   oncall/
     rootly.ts         Rootly API client for on-call schedules
+  snowflake/
+    client.ts         Snowflake connection + runQuery (snowflake-sdk wrapper)
   holidays.ts         Portuguese and US public holiday computation
 
 data/                 Runtime data (gitignored except config.example.json)
   teams.json          List of teams
   active-team.json    Currently active team ID
+  snowflake-features.json   Saved feature configs (name, description, SQL charts)
+  snowflake-connections.json  Named connection profiles (database, warehouse, schema)
   teams/{id}/         Per-team data directory
     config.json       Team config
     absences.json     Absences
@@ -224,3 +235,20 @@ GET /api/capacity
   ├─ computeWorkingDays()   → Mon–Fri count per sprint
   └─ buildCapacityMatrix()  → SprintCapacity[] with per-member breakdown
 ```
+
+## Data Flow: Snowflake Query
+
+```
+POST /api/snowflake/query  { sql, connectionId? }
+  │
+  ├─ loadConnection()       → read database/warehouse/schema from snowflake-connections.json
+  └─ runQuery(sql, overrides)
+       │
+       ├─ getConnection()   → createConnection() via snowflake-sdk
+       │                       credentials: SNOWFLAKE_ACCOUNT, SNOWFLAKE_USER, SNOWFLAKE_TOKEN
+       │                       auth: PROGRAMMATIC_ACCESS_TOKEN
+       ├─ conn.connect()    → establish session
+       └─ conn.execute()    → return rows as Record<string, unknown>[]
+```
+
+Unlike Jira/Rootly, results are never written to disk — each query runs live and returns directly to the browser.

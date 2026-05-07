@@ -21,6 +21,8 @@ import {
   SquaresFour,
   CaretDown,
   NotePencil,
+  ChartLineUp,
+  MagnifyingGlass,
 } from '@phosphor-icons/react'
 
 type NavChild = { href: string; label: string; Icon: React.ElementType }
@@ -62,6 +64,13 @@ const sections: NavSection[] = [
       { href: '/team', label: 'Team', Icon: Users },
       { href: '/allocation', label: 'Allocation', Icon: Target },
       { href: '/oncall', label: 'On Call', Icon: Bell },
+    ],
+  },
+  {
+    label: 'DATA',
+    items: [
+      { href: '/snowflake/features', label: 'Features', Icon: ChartLineUp },
+      { href: '/snowflake/query', label: 'Query', Icon: MagnifyingGlass },
     ],
   },
 ]

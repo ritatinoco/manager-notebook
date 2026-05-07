@@ -12,7 +12,8 @@
     "next": "^16",
     "react": "^19",
     "react-dom": "^19",
-    "recharts": "^2.13.0"
+    "recharts": "^2.13.0",
+    "snowflake-sdk": "^2.4.0"
   },
   "devDependencies": {
     "@types/node": "^22.19.17",

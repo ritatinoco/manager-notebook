@@ -35,7 +35,7 @@ function IntegrationsPanel({ children }: { children: React.ReactNode }) {
         Integrations
       </button>
       {open && (
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-2 gap-4">
           {children}
         </div>
       )}
@@ -90,6 +90,18 @@ export default function SettingsPage() {
   const [hasEomToken, setHasEomToken] = useState(false)
   const [eomTokenStatus, setEomTokenStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
 
+  const [snowflakeFields, setSnowflakeFields] = useState({
+    SNOWFLAKE_ACCOUNT: '',
+    SNOWFLAKE_USER: '',
+    SNOWFLAKE_TOKEN: '',
+  })
+
+  const [sfConnections, setSfConnections] = useState<{ id: string; name: string; database: string; warehouse: string; schema: string }[]>([])
+  const [sfConnForm, setSfConnForm] = useState<{ name: string; database: string; warehouse: string; schema: string } | null>(null)
+  const [sfConnEditId, setSfConnEditId] = useState<string | null>(null)
+  const [hasSnowflakeToken, setHasSnowflakeToken] = useState(false)
+  const [snowflakeSaveStatus, setSnowflakeSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
+
   // ── Danger Zone ────────────────────────────────────────────────────────────
   const [deleteConfirm, setDeleteConfirm] = useState(false)
   const [deleteStatus, setDeleteStatus] = useState<'idle' | 'deleting' | 'error'>('idle')
@@ -117,13 +129,24 @@ export default function SettingsPage() {
       setHasEomToken(d.hasToken)
       if (d.EOM_TOKEN) setEomToken(d.EOM_TOKEN)
     })
+    fetch('/api/snowflake/connections').then((r) => r.json()).then(setSfConnections)
+    fetch('/api/snowflake/env').then((r) => r.json()).then((d) => {
+      setHasSnowflakeToken(d.hasToken)
+      setSnowflakeFields({
+        SNOWFLAKE_ACCOUNT: d.SNOWFLAKE_ACCOUNT ?? '',
+        SNOWFLAKE_USER: d.SNOWFLAKE_USER ?? '',
+        SNOWFLAKE_TOKEN: d.SNOWFLAKE_TOKEN ?? '',
+      })
+    })
     fetch('/api/config').then((r) => r.json()).then((c: Config) => {
       if (c.eom_last_synced) setEomLastSynced(c.eom_last_synced)
       const mp = c.manager_profile ?? {}
+      const email = mp.email ?? ''
       setProfile({
         name: [mp.first_name, mp.last_name].filter(Boolean).join(' ') || (c.oncall_supervisor ?? ''),
-        email: mp.email ?? '',
+        email,
       })
+      if (email) setSnowflakeFields((f) => ({ ...f, SNOWFLAKE_USER: f.SNOWFLAKE_USER || email }))
     })
   }, [])
 
@@ -219,6 +242,50 @@ export default function SettingsPage() {
     })
     setRootlySaveStatus(res.ok ? 'saved' : 'error')
     if (res.ok) setTimeout(() => setRootlySaveStatus('idle'), 2500)
+  }
+
+  async function saveSnowflake() {
+    setSnowflakeSaveStatus('saving')
+    const res = await fetch('/api/snowflake/env', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(snowflakeFields),
+    })
+    if (res.ok) {
+      if (snowflakeFields.SNOWFLAKE_TOKEN && snowflakeFields.SNOWFLAKE_TOKEN !== '••••••••') {
+        setHasSnowflakeToken(true)
+        setSnowflakeFields((f) => ({ ...f, SNOWFLAKE_TOKEN: '' }))
+      }
+      setSnowflakeSaveStatus('saved')
+      setTimeout(() => setSnowflakeSaveStatus('idle'), 2500)
+    } else {
+      setSnowflakeSaveStatus('error')
+    }
+  }
+
+  async function saveSfConnection() {
+    if (!sfConnForm?.name.trim()) return
+    const method = sfConnEditId ? 'PATCH' : 'POST'
+    const body = sfConnEditId ? { id: sfConnEditId, ...sfConnForm } : sfConnForm
+    const res = await fetch('/api/snowflake/connections', {
+      method,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+    if (res.ok) {
+      setSfConnections(await res.json())
+      setSfConnForm(null)
+      setSfConnEditId(null)
+    }
+  }
+
+  async function deleteSfConnection(id: string) {
+    const res = await fetch('/api/snowflake/connections', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id }),
+    })
+    if (res.ok) setSfConnections(await res.json())
   }
 
   async function saveEomToken() {
@@ -480,6 +547,100 @@ export default function SettingsPage() {
           </div>
           {eomLastSynced && (
             <p className="text-[10px] text-gray-400 mt-3">Last synced {new Date(eomLastSynced).toLocaleString()}</p>
+          )}
+        </div>
+
+        {/* Snowflake */}
+        <div className="bg-white border border-gray-200 rounded-xl p-4">
+          <div className="flex items-center gap-2 mb-1">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+              <path d="M12 2L9.5 6.5l-5-1.5 1.5 5L2 12l4 1.5L4.5 18.5l5-1.5L12 22l2.5-5 5 1.5-1.5-5L22 12l-4-1.5 1.5-5.5-5 1.5L12 2z" fill="#29B5E8"/>
+            </svg>
+            <h3 className="text-sm font-semibold text-gray-700">Snowflake</h3>
+          </div>
+          <p className="text-xs text-gray-400 mb-4">
+            Query Snowflake data and track feature metrics. Credentials stored in <code className="bg-gray-100 px-1 rounded">.env.local</code>, never committed.
+          </p>
+          <div className="space-y-3">
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Account</label>
+              <input className={inputCls} placeholder="xy12345.us-east-1" value={snowflakeFields.SNOWFLAKE_ACCOUNT}
+                onChange={(e) => { setSnowflakeFields((f) => ({ ...f, SNOWFLAKE_ACCOUNT: e.target.value })); setSnowflakeSaveStatus('idle') }} />
+              <p className="text-xs text-gray-400 mt-1">From your Snowflake login URL: <code className="bg-gray-100 px-1 rounded">https://&lt;account&gt;.snowflakecomputing.com</code></p>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">API Token</label>
+              <input className={inputCls} type="password"
+                placeholder={hasSnowflakeToken ? 'Token saved — paste to replace' : 'Paste your API token'}
+                value={snowflakeFields.SNOWFLAKE_TOKEN}
+                onChange={(e) => { setSnowflakeFields((f) => ({ ...f, SNOWFLAKE_TOKEN: e.target.value })); setHasSnowflakeToken(false); setSnowflakeSaveStatus('idle') }} />
+            </div>
+          </div>
+          <div className="flex items-center gap-2 mt-4">
+            <Button size="sm" onClick={saveSnowflake} disabled={snowflakeSaveStatus === 'saving'}>
+              {snowflakeSaveStatus === 'saving' ? 'Saving…' : 'Save'}
+            </Button>
+            {snowflakeSaveStatus === 'saved' && <span className="text-xs text-green-600">✓ Saved</span>}
+            {snowflakeSaveStatus === 'error' && <span className="text-xs text-red-600">Failed</span>}
+          </div>
+        </div>
+
+        {/* Snowflake Connections */}
+        <div className="bg-white border border-gray-200 rounded-xl p-4 col-span-2">
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <h3 className="text-sm font-semibold text-gray-700">Snowflake Connections</h3>
+              <p className="text-xs text-gray-400 mt-0.5">Named database + warehouse profiles you can pick when querying.</p>
+            </div>
+            {!sfConnForm && (
+              <button
+                onClick={() => { setSfConnForm({ name: '', database: '', warehouse: '', schema: '' }); setSfConnEditId(null) }}
+                className="text-xs text-indigo-600 border border-indigo-200 rounded-lg px-2.5 py-1 hover:bg-indigo-50"
+              >
+                + Add
+              </button>
+            )}
+          </div>
+
+          {sfConnections.length > 0 && (
+            <div className="space-y-2 mb-3">
+              {sfConnections.map((c) => (
+                <div key={c.id} className="flex items-center justify-between rounded-lg border border-gray-100 px-3 py-2 text-sm">
+                  <div>
+                    <span className="font-medium text-gray-700">{c.name}</span>
+                    <span className="text-gray-400 ml-2 text-xs">{c.database}{c.warehouse ? ` · ${c.warehouse}` : ''}{c.schema ? ` · ${c.schema}` : ''}</span>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button onClick={() => { setSfConnEditId(c.id); setSfConnForm({ name: c.name, database: c.database, warehouse: c.warehouse, schema: c.schema }) }}
+                      className="text-xs text-gray-400 hover:text-gray-700">Edit</button>
+                    <button onClick={() => deleteSfConnection(c.id)} className="text-xs text-red-400 hover:text-red-600">Delete</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {sfConnForm && (
+            <div className="border border-gray-200 rounded-lg p-3 space-y-2">
+              <input className={inputCls} placeholder="Connection name (e.g. Engineering Metrics)" value={sfConnForm.name}
+                onChange={(e) => setSfConnForm((f) => f && ({ ...f, name: e.target.value }))} />
+              <div className="grid grid-cols-2 gap-2">
+                <input className={inputCls} placeholder="Database" value={sfConnForm.database}
+                  onChange={(e) => setSfConnForm((f) => f && ({ ...f, database: e.target.value }))} />
+                <input className={inputCls} placeholder="Warehouse" value={sfConnForm.warehouse}
+                  onChange={(e) => setSfConnForm((f) => f && ({ ...f, warehouse: e.target.value }))} />
+              </div>
+              <input className={inputCls} placeholder="Schema (optional)" value={sfConnForm.schema}
+                onChange={(e) => setSfConnForm((f) => f && ({ ...f, schema: e.target.value }))} />
+              <div className="flex items-center gap-2 pt-1">
+                <Button size="sm" onClick={saveSfConnection} disabled={!sfConnForm.name.trim()}>Save</Button>
+                <button onClick={() => { setSfConnForm(null); setSfConnEditId(null) }} className="text-xs text-gray-500 hover:text-gray-700">Cancel</button>
+              </div>
+            </div>
+          )}
+
+          {sfConnections.length === 0 && !sfConnForm && (
+            <p className="text-xs text-gray-400">No connections yet.</p>
           )}
         </div>
       </IntegrationsPanel>
