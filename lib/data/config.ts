@@ -59,6 +59,8 @@ export interface Config {
   eom_last_synced?: string
   /** Team average velocity in SP per sprint — used on the allocation page */
   team_avg_velocity?: number
+  /** Slack channel to post support ticket updates to (e.g. #team-support) */
+  slack_support_channel?: string
 }
 
 const DEFAULT_CONFIG: Config = {
