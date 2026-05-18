@@ -8,6 +8,7 @@
     "start": "next start"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.95.2",
     "@phosphor-icons/react": "^2.1.10",
     "next": "^16",
     "react": "^19",

@@ -128,6 +128,27 @@ export default function OnCallPage() {
         </div>
       )}
 
+      {rows !== null && rows.length > 0 && (() => {
+        const daysInMonth = new Date(year, month, 0).getDate()
+        const totalCovered = rows.reduce((sum, r) => sum + r.weekdayDays + r.weekendDays, 0)
+        const covered = totalCovered === daysInMonth
+        return (
+          <div className={`mb-4 flex items-center gap-4 px-4 py-3 rounded-lg border text-sm ${covered ? 'bg-green-50 border-green-200' : 'bg-amber-50 border-amber-200'}`}>
+            <span className="text-gray-600">
+              <span className="font-medium text-gray-900">{daysInMonth}</span> days in {MONTHS[month - 1]} {year}
+            </span>
+            <span className="text-gray-300">·</span>
+            <span className="text-gray-600">
+              Total on-call days: <span className="font-medium text-gray-900">{totalCovered}</span>
+            </span>
+            <span className="text-gray-300">·</span>
+            <span className={covered ? 'text-green-700 font-medium' : 'text-amber-700 font-medium'}>
+              {covered ? '✓ Full coverage' : `${totalCovered > daysInMonth ? '+' : ''}${totalCovered - daysInMonth} days ${totalCovered > daysInMonth ? 'over' : 'missing'}`}
+            </span>
+          </div>
+        )
+      })()}
+
       {rows !== null && (
         rows.length === 0 ? (
           <p className="text-sm text-gray-500">No on-call data found for this period.</p>

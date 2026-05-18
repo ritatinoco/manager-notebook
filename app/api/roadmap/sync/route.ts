@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { fetchTeamEpics, fetchVMsByKeys, fetchInitiativesByKeys, fetchDevelopmentStartDate, fetchValueStreamFieldId, fetchDetailedStatusFieldId } from '@/lib/jira/roadmap'
+import { fetchTeamEpics, fetchTeamVMs, fetchVMsByKeys, fetchInitiativesByKeys, fetchDevelopmentStartDate, fetchValueStreamFieldId, fetchDetailedStatusFieldId } from '@/lib/jira/roadmap'
 import { saveRoadmapCache } from '@/lib/data/roadmap-cache'
 import { getActiveTeam } from '@/lib/data/teams'
 
@@ -20,11 +20,19 @@ export async function POST() {
     // 1. Fetch epics assigned to this team
     const epics = await fetchTeamEpics(team.name)
 
-    // 2. Fetch VMs by parent keys from epics (discover Detailed Status field in parallel)
+    // 2. Fetch VMs by parent keys from epics + VMs directly assigned to team
     const vmKeys = [...new Set(epics.map((e) => e.parentKey).filter(Boolean) as string[])]
-    const [vmsRaw] = await Promise.all([
-      fetchDetailedStatusFieldId().then((dsFieldId) => fetchVMsByKeys(vmKeys, dsFieldId)),
+    const dsFieldId = await fetchDetailedStatusFieldId()
+    const [vmsFromEpics, vmsFromTeam] = await Promise.all([
+      fetchVMsByKeys(vmKeys, dsFieldId),
+      fetchTeamVMs(team.name, dsFieldId),
     ])
+    // Merge: team VMs take precedence; deduplicate by key
+    const vmMap = new Map<string, typeof vmsFromEpics[number]>()
+    for (const vm of vmsFromEpics) vmMap.set(vm.key, vm)
+    for (const vm of vmsFromTeam) vmMap.set(vm.key, vm)
+    const vmsRaw = [...vmMap.values()]
+    const teamVMKeys = new Set(vmsFromTeam.map((v) => v.key))
 
     // 3. Filtering helpers
     const cutoff = Date.now() - 90 * 24 * 60 * 60 * 1000
@@ -71,8 +79,9 @@ export async function POST() {
           .filter((e) => isVisible(e.status, e.resolvedAt, e.targetEnd) && e.status.toLowerCase() !== 'cancelled')
           .map(({ parentKey: _pk, ...rest }) => rest),
       }))
-      // Drop VMs whose only team epics were all cancelled/filtered out
-      .filter((vm) => vm.epics.length > 0)
+      // Drop VMs whose only team epics were all cancelled/filtered out,
+      // unless the VM is directly assigned to the team
+      .filter((vm) => vm.epics.length > 0 || teamVMKeys.has(vm.key))
 
     // 5. Orphan epics (no VM parent) — split by paused
     const orphanEpicsAll = (epicsByVM.get('__none__') ?? []).filter((e) =>

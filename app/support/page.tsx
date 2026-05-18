@@ -8,6 +8,7 @@ interface Ticket {
   summary: string
   status: string
   assignee: string | null
+  slackUserId: string | null
   priority: string | null
 }
 
@@ -48,6 +49,16 @@ const PRIORITY_COLOR: Record<string, { bg: string; color: string }> = {
   'Normal':        { bg: '#f3f4f6', color: '#6b7280' },
 }
 
+function StatusBadge({ status }: { status: string }) {
+  const s = STATUS_BADGE[status] ?? { bg: '#f3f4f6', color: '#6b7280' }
+  return (
+    <span className="inline-block rounded px-1.5 py-0.5 text-xs font-semibold whitespace-nowrap"
+      style={{ backgroundColor: s.bg, color: s.color }}>
+      {status}
+    </span>
+  )
+}
+
 function PriorityBadge({ priority }: { priority: string | null }) {
   if (!priority) return <span className="text-xs text-gray-300">—</span>
   const p = PRIORITY_COLOR[priority] ?? { bg: '#f3f4f6', color: '#6b7280' }
@@ -64,14 +75,12 @@ export default function SupportTicketsPage() {
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState('')
-  const [channel, setChannel] = useState('')
-  const [channelDraft, setChannelDraft] = useState('')
-  const [savingChannel, setSavingChannel] = useState(false)
-  const [channelSaved, setChannelSaved] = useState(false)
   const [slackMessage, setSlackMessage] = useState('')
   const [copied, setCopied] = useState(false)
-  const channelSavedTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [sending, setSending] = useState(false)
+  const [sendResult, setSendResult] = useState<{ ok?: boolean; error?: string } | null>(null)
   const copiedTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const sendResultTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   async function load(showRefreshing = false) {
     if (showRefreshing) setRefreshing(true)
@@ -86,8 +95,6 @@ export default function SupportTicketsPage() {
       }
       const json: TicketsResponse = await res.json()
       setData(json)
-      setChannel(json.slackChannel)
-      setChannelDraft(json.slackChannel)
     } catch (e) {
       setError(String(e))
     } finally {
@@ -98,28 +105,48 @@ export default function SupportTicketsPage() {
 
   useEffect(() => { load() }, [])
 
-  async function saveChannel() {
-    setSavingChannel(true)
-    await fetch('/api/support-tickets/config', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ slackChannel: channelDraft }),
-    })
-    setChannel(channelDraft)
-    setSavingChannel(false)
-    setChannelSaved(true)
-    if (channelSavedTimer.current) clearTimeout(channelSavedTimer.current)
-    channelSavedTimer.current = setTimeout(() => setChannelSaved(false), 3000)
-  }
-
   function composeMessage() {
     if (!data) return
     const tickets = data.tickets.filter((t) => ACTIVE_STATUSES.has(t.status))
     const lines = tickets.map((t) => {
-      const assignee = t.assignee ? ` (${t.assignee})` : ''
-      return `• ${t.priority ? `[${t.priority}] ` : ''}${t.key} — ${t.summary}${assignee}`
+      const keyLink = data.jiraBaseUrl ? `<${data.jiraBaseUrl}/browse/${t.key}|${t.key}>` : t.key
+      const assignee = t.slackUserId ? ` <@${t.slackUserId}>` : t.assignee ? ` @${t.assignee}` : ''
+      const priorityEmoji: Record<string, string> = {
+        'Normal': ':jira-normal:',
+        'Low': ':jira-low:',
+        'Lowest': ':jira-low:',
+        'Low Priority': ':jira-low:',
+        'High': ':jira-critical:',
+        'Urgent': ':jira-urgent:',
+        'Blocker': ':jira-blocker:',
+        'Critical': ':jira-critical:',
+      }
+      const priority = t.priority ? (priorityEmoji[t.priority] ?? `[${t.priority}]`) + ' ' : ''
+      return `• ${priority}${keyLink} — ${t.summary}${assignee}`
     })
-    setSlackMessage(`*Support Update — Client Runtime*\n*In Progress:*\n${lines.join('\n')}`)
+    setSlackMessage(`:this-is-fine-fire: *Daily Support Update* :this-is-fine-fire:\n\n*In Progress:*\n\n${lines.join('\n')}`)
+    setSendResult(null)
+  }
+
+  async function sendToSlack() {
+    if (!slackMessage) return
+    setSending(true)
+    setSendResult(null)
+    try {
+      const res = await fetch('/api/slack/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: slackMessage }),
+      })
+      const json = await res.json()
+      setSendResult(json)
+    } catch (e) {
+      setSendResult({ error: String(e) })
+    } finally {
+      setSending(false)
+      if (sendResultTimer.current) clearTimeout(sendResultTimer.current)
+      sendResultTimer.current = setTimeout(() => setSendResult(null), 5000)
+    }
   }
 
   function copyMessage() {
@@ -184,6 +211,7 @@ export default function SupportTicketsPage() {
               <tr className="border-b border-gray-100 bg-gray-50">
                 <th className="text-left text-xs font-semibold text-gray-400 uppercase tracking-wide px-4 py-2.5 w-28">Key</th>
                 <th className="text-left text-xs font-semibold text-gray-400 uppercase tracking-wide px-4 py-2.5">Summary</th>
+                <th className="text-left text-xs font-semibold text-gray-400 uppercase tracking-wide px-4 py-2.5 w-44">Status</th>
                 <th className="text-left text-xs font-semibold text-gray-400 uppercase tracking-wide px-4 py-2.5 w-36">Assignee</th>
                 <th className="text-left text-xs font-semibold text-gray-400 uppercase tracking-wide px-4 py-2.5 w-20">Priority</th>
               </tr>
@@ -206,6 +234,7 @@ export default function SupportTicketsPage() {
                     )}
                   </td>
                   <td className="px-4 py-2.5 text-gray-800">{ticket.summary}</td>
+                  <td className="px-4 py-2.5"><StatusBadge status={ticket.status} /></td>
                   <td className="px-4 py-2.5 text-gray-500 text-xs">{ticket.assignee ?? <span className="text-gray-300">Unassigned</span>}</td>
                   <td className="px-4 py-2.5"><PriorityBadge priority={ticket.priority} /></td>
                 </tr>
@@ -219,61 +248,45 @@ export default function SupportTicketsPage() {
       <div className="bg-white border border-gray-200 rounded-xl px-5 py-4">
         <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Slack Update</p>
 
-        {/* Channel config */}
-        <div className="flex items-center gap-2 mb-4">
-          <label className="text-xs text-gray-500 shrink-0">Channel ID</label>
-          <input
-            type="text"
-            value={channelDraft}
-            onChange={(e) => setChannelDraft(e.target.value)}
-            onBlur={saveChannel}
-            onKeyDown={(e) => e.key === 'Enter' && saveChannel()}
-            placeholder="C0123456789"
-            className="text-sm border border-gray-200 rounded-lg px-3 py-1.5 w-44 focus:outline-none focus:ring-1 focus:ring-indigo-400"
-          />
-          <button
-            onClick={saveChannel}
-            disabled={savingChannel || channelDraft === channel}
-            className="text-xs text-indigo-600 border border-indigo-200 rounded-lg px-2.5 py-1.5 hover:bg-indigo-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-          >
-            {savingChannel ? 'Saving…' : 'Save'}
-          </button>
-          {channelSaved && <span className="text-xs text-green-600">Saved ✓</span>}
-        </div>
-
         {/* Compose + preview */}
         <div className="flex items-center gap-3 mb-3">
           <button
             onClick={composeMessage}
             disabled={inProgressCount === 0}
-            className="flex items-center gap-1.5 text-sm font-medium text-white bg-indigo-600 rounded-lg px-3 py-1.5 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="flex items-center gap-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg px-3 py-1.5 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
-            <PaperPlaneTilt size={14} weight="duotone" />
-            Compose message
+            Compose
           </button>
           {slackMessage && (
-            <button
-              onClick={copyMessage}
-              className="flex items-center gap-1.5 text-xs text-gray-500 border border-gray-200 rounded-lg px-2.5 py-1.5 hover:bg-gray-50 transition-colors"
-            >
-              {copied ? <CheckFat size={13} weight="fill" className="text-green-500" /> : <CopySimple size={13} weight="duotone" />}
-              {copied ? 'Copied' : 'Copy'}
-            </button>
+            <>
+              <button
+                onClick={sendToSlack}
+                disabled={sending}
+                className="flex items-center gap-1.5 text-sm font-medium text-white bg-indigo-600 rounded-lg px-3 py-1.5 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                <PaperPlaneTilt size={14} weight="duotone" />
+                {sending ? 'Sending…' : 'Send'}
+              </button>
+              <button
+                onClick={copyMessage}
+                className="flex items-center gap-1.5 text-xs text-gray-500 border border-gray-200 rounded-lg px-2.5 py-1.5 hover:bg-gray-50 transition-colors"
+              >
+                {copied ? <CheckFat size={13} weight="fill" className="text-green-500" /> : <CopySimple size={13} weight="duotone" />}
+                {copied ? 'Copied' : 'Copy'}
+              </button>
+            </>
           )}
+          {sendResult?.ok && <span className="text-xs text-green-600 font-medium">Sent ✓</span>}
+          {sendResult?.error && <span className="text-xs text-red-600">{sendResult.error}</span>}
         </div>
 
         {slackMessage && (
-          <div>
-            <textarea
-              value={slackMessage}
-              onChange={(e) => setSlackMessage(e.target.value)}
-              rows={inProgressCount + 2}
-              className="w-full text-xs font-mono text-gray-700 border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-1 focus:ring-indigo-400 resize-none bg-gray-50"
-            />
-            <p className="text-xs text-gray-400 mt-1.5">
-              Ask Claude: <span className="font-mono bg-gray-100 px-1.5 py-0.5 rounded">send the support update to Slack</span>
-            </p>
-          </div>
+          <textarea
+            value={slackMessage}
+            onChange={(e) => setSlackMessage(e.target.value)}
+            rows={Math.max(inProgressCount + 4, 10)}
+            className="w-full text-xs font-mono text-gray-700 border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-1 focus:ring-indigo-400 resize-none bg-gray-50"
+          />
         )}
       </div>
     </div>

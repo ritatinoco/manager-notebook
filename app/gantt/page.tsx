@@ -5,6 +5,11 @@ import type { InitiativeCache, VMCache, EpicCache } from '@/lib/data/roadmap-cac
 import type { ValueStreamConfig } from '@/lib/data/value-streams'
 import { ArrowsClockwise, Rocket, Diamond } from '@phosphor-icons/react'
 
+// Release milestones — add future releases here
+const RELEASES: { name: string; date: Date }[] = [
+  { name: 'ONE conf', date: new Date(new Date().getFullYear(), 5, 2) }, // June 2
+]
+
 const DAY_PX = 4          // pixels per day — narrower so quarters fit naturally
 const INI_H = 38
 const VM_H = 34
@@ -212,6 +217,11 @@ export default function GanttPage() {
   const oneConferenceDate = new Date(today.getFullYear(), 5, 2) // June 2
   const oneConferenceLeft = daysBetween(rangeStart, oneConferenceDate) * DAY_PX
 
+  const nextRelease = RELEASES
+    .filter((r) => r.date >= today)
+    .sort((a, b) => a.date.getTime() - b.date.getTime())[0] ?? null
+  const daysToRelease = nextRelease ? daysBetween(today, nextRelease.date) : null
+
   function barProps(targetStart: string | null, targetEnd: string | null) {
     const start = targetStart ? new Date(targetStart + 'T00:00:00') : null
     const end = targetEnd ? new Date(targetEnd + 'T00:00:00') : null
@@ -414,7 +424,22 @@ export default function GanttPage() {
   return (
     <div className="flex flex-col" style={{ height: 'calc(100vh - 100px)' }}>
       <div className="flex items-center justify-between mb-4 shrink-0">
-        <h1 className="text-xl font-bold text-gray-900">Timeline</h1>
+        <div className="flex items-center gap-4">
+          <h1 className="text-xl font-bold text-gray-900">Timeline</h1>
+          {nextRelease && daysToRelease !== null && (
+            <div className="flex items-center gap-1.5 bg-amber-50 border border-amber-200 rounded-lg px-3 py-1"
+              title={`${nextRelease.name} on ${nextRelease.date.toLocaleDateString()}`}>
+              <div className="w-2 h-2 rounded-full bg-amber-400 shrink-0" />
+              <span className="text-xs font-medium text-amber-700">
+                {nextRelease.name}
+              </span>
+              <span className="text-xs text-amber-500">·</span>
+              <span className="text-xs font-semibold text-amber-700">
+                {daysToRelease === 0 ? 'Today!' : daysToRelease === 1 ? '1 day' : `${daysToRelease} days`}
+              </span>
+            </div>
+          )}
+        </div>
         <div className="flex items-center gap-3">
           {syncedAt && <span className="text-xs text-gray-400">Last synced {new Date(syncedAt).toLocaleString()}</span>}
           <button onClick={refresh} disabled={syncing}

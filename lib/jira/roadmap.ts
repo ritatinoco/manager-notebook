@@ -102,6 +102,37 @@ export async function fetchTeamEpics(teamName: string): Promise<(EpicCache & { p
   }))
 }
 
+export async function fetchTeamVMs(teamName: string, detailedStatusFieldId?: string | null): Promise<(VMCache & { parentKey: string | null })[]> {
+  const pmKey = process.env.JIRA_PM_PROJECT_KEY
+  if (!pmKey) throw new Error('JIRA_PM_PROJECT_KEY is not set')
+
+  const jql = `project = "${pmKey}" AND issuetype = "Value Milestone" AND "Teams[Select List (multiple choices)]" = "${teamName}" ORDER BY customfield_15486 ASC`
+  const fields = ['key', 'summary', 'status', 'parent', 'assignee', 'customfield_15485', 'customfield_15486', 'customfield_15727', 'resolutiondate', 'statuscategorychangedate']
+  if (detailedStatusFieldId) fields.push(detailedStatusFieldId)
+
+  const issues = await searchJira(jql, fields)
+
+  return issues.map((i) => {
+    const a = i.fields.assignee
+    const assignee: VMAssignee | null = a
+      ? { accountId: a.accountId, displayName: a.displayName, avatarUrl: a.avatarUrls?.['48x48'] ?? null }
+      : null
+    return {
+      key: i.key,
+      summary: i.fields.summary,
+      status: i.fields.status.name,
+      targetStart: i.fields.customfield_15485 ?? null,
+      targetEnd: i.fields.customfield_15486 ?? null,
+      recentUpdate: i.fields.customfield_15727 ?? null,
+      detailedStatus: detailedStatusFieldId ? extractText(i.fields[detailedStatusFieldId]) : null,
+      resolvedAt: i.fields.resolutiondate ?? i.fields.statuscategorychangedate ?? null,
+      assignee,
+      epics: [],
+      parentKey: i.fields.parent?.key ?? null,
+    }
+  })
+}
+
 export async function fetchVMsByKeys(vmKeys: string[], detailedStatusFieldId?: string | null): Promise<(VMCache & { parentKey: string | null })[]> {
   if (vmKeys.length === 0) return []
 

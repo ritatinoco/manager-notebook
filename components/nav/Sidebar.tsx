@@ -16,9 +16,9 @@ import {
   ArrowRight,
   GearSix,
   Bell,
-  MapTrifold,
+  Kanban,
   Rows,
-  SquaresFour,
+  MapTrifold,
   CaretDown,
   NotePencil,
   ChartLineUp,
@@ -55,9 +55,9 @@ const sections: NavSection[] = [
   {
     label: 'PLANNING',
     items: [
-      { href: '/roadmap', label: 'Roadmap', Icon: MapTrifold },
+      { href: '/roadmap', label: 'Portfolio', Icon: Kanban },
       { href: '/gantt', label: 'Initiatives', Icon: Rows },
-      { href: '/vm-timeline', label: 'VMs', Icon: SquaresFour },
+      { href: '/vm-timeline', label: 'VMs', Icon: MapTrifold },
     ],
   },
   {

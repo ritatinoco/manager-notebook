@@ -5,7 +5,7 @@ import { getConfig, saveConfig } from '@/lib/data/config'
 
 const ENV_PATH = path.join(process.cwd(), '.env.local')
 
-const MANAGED_KEYS = ['JIRA_BASE_URL', 'JIRA_EMAIL', 'JIRA_API_TOKEN', 'ROOTLY_TOKEN', 'JIRA_PM_PROJECT_KEY'] as const
+const MANAGED_KEYS = ['JIRA_BASE_URL', 'JIRA_EMAIL', 'JIRA_API_TOKEN', 'ROOTLY_TOKEN', 'JIRA_PM_PROJECT_KEY', 'SLACK_BOT_TOKEN'] as const
 
 function readEnvFile(): Record<string, string> {
   if (!fs.existsSync(ENV_PATH)) return {}
@@ -45,6 +45,9 @@ export async function GET() {
     oncall_schedule_id: config.oncall_schedule_id ?? '',
     oncall_department: config.oncall_department ?? '',
     oncall_supervisor: config.oncall_supervisor ?? '',
+    SLACK_BOT_TOKEN: (vars.SLACK_BOT_TOKEN || process.env.SLACK_BOT_TOKEN) ? '••••••••' : '',
+    hasSlackToken: !!(vars.SLACK_BOT_TOKEN || process.env.SLACK_BOT_TOKEN),
+    slack_support_channel: config.slack_support_channel ?? '',
   })
 }
 
@@ -55,7 +58,7 @@ export async function POST(req: NextRequest) {
   for (const key of MANAGED_KEYS) {
     const val = body[key]?.trim()
     if (!val) continue
-    if ((key === 'JIRA_API_TOKEN' || key === 'ROOTLY_TOKEN') && val === '••••••••') continue
+    if ((key === 'JIRA_API_TOKEN' || key === 'ROOTLY_TOKEN' || key === 'SLACK_BOT_TOKEN') && val === '••••••••') continue
     toWrite[key] = val
   }
 
@@ -71,7 +74,8 @@ export async function POST(req: NextRequest) {
   const scheduleId = body['oncall_schedule_id']?.trim()
   const department = body['oncall_department']?.trim()
   const supervisor = body['oncall_supervisor']?.trim()
-  if (projectKey || scheduleId !== undefined || department !== undefined || supervisor !== undefined) {
+  const slackChannel = body['slack_support_channel']
+  if (projectKey || scheduleId !== undefined || department !== undefined || supervisor !== undefined || slackChannel !== undefined) {
     const config = getConfig()
     saveConfig({
       ...config,
@@ -79,6 +83,7 @@ export async function POST(req: NextRequest) {
       ...(scheduleId !== undefined ? { oncall_schedule_id: scheduleId } : {}),
       ...(department !== undefined ? { oncall_department: department } : {}),
       ...(supervisor !== undefined ? { oncall_supervisor: supervisor } : {}),
+      ...(slackChannel !== undefined ? { slack_support_channel: slackChannel } : {}),
     })
   }
 

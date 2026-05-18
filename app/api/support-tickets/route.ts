@@ -30,15 +30,21 @@ export async function GET() {
       maxResults: 100,
     })
 
-    const tickets = data.issues.map((issue) => ({
-      key: issue.key,
-      summary: issue.fields.summary,
-      status: issue.fields.status.name,
-      assignee: issue.fields.assignee?.displayName ?? null,
-      priority: issue.fields.priority?.name ?? null,
-    }))
-
     const config = getConfig()
+    const members = config.team_members
+
+    const tickets = data.issues.map((issue) => {
+      const displayName = issue.fields.assignee?.displayName ?? null
+      const member = displayName ? members.find((m) => m.name === displayName) : undefined
+      return {
+        key: issue.key,
+        summary: issue.fields.summary,
+        status: issue.fields.status.name,
+        assignee: displayName,
+        slackUserId: member?.slack_user_id ?? null,
+        priority: issue.fields.priority?.name ?? null,
+      }
+    })
 
     return NextResponse.json({
       tickets,

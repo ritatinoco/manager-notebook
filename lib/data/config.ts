@@ -21,6 +21,8 @@ export interface MemberConfig {
   supervisor?: string
   /** EOM person ID — used to resolve the avatar served by /api/avatars/[id] */
   eom_id?: number
+  /** Slack member ID (e.g. U0123456789) — for proper @mentions in messages */
+  slack_user_id?: string
 }
 
 /** Profile for the manager themselves — used to filter EOM direct reports */

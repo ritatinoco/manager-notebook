@@ -5,6 +5,10 @@ import type { InitiativeCache, VMCache, EpicCache, VMAssignee } from '@/lib/data
 import type { ValueStreamConfig } from '@/lib/data/value-streams'
 import { ArrowsClockwise, Rocket, Diamond, GearSix, PencilSimple, Check, X, Article } from '@phosphor-icons/react'
 
+const RELEASES: { name: string; date: Date }[] = [
+  { name: 'ONE conf', date: new Date(new Date().getFullYear(), 5, 2) }, // June 2
+]
+
 function fmtDate(iso: string | null | undefined): string {
   if (!iso) return '—'
   return new Date(iso + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
@@ -569,7 +573,8 @@ export default function RoadmapPage() {
       vms: ini.vms
         .filter((vm) => !isDone(vm.status))
         .map((vm) => ({ ...vm, epics: vm.epics.filter((e) => !isDone(e.status)) }))
-        .filter((vm) => vm.epics.length > 0),
+        // Only drop a VM if it had epics that were all filtered out (all done); keep VMs with no epics at all
+        .filter((vm) => vm.epics.length > 0 || !ini.vms.find((v) => v.key === vm.key)?.epics.length),
     }
   }
 
@@ -590,9 +595,9 @@ export default function RoadmapPage() {
     .filter(Boolean) as InitiativeCache[]
 
   const nonDoneInis = allInitiatives.map(withoutDone)
-  const activeInis = sortActive(nonDoneInis.filter((i) => classifyInitiative(i) === 'active' && (i.vms.length > 0 || i.key)))
-  const definitionInis = nonDoneInis.filter((i) => classifyInitiative(i) === 'definition')
-  const pausedInis = nonDoneInis.filter((i) => classifyInitiative(i) === 'paused')
+  const activeInis = sortActive(nonDoneInis.filter((i) => classifyInitiative(i) === 'active' && i.vms.length > 0))
+  const definitionInis = nonDoneInis.filter((i) => classifyInitiative(i) === 'definition' && i.vms.length > 0)
+  const pausedInis = nonDoneInis.filter((i) => classifyInitiative(i) === 'paused' && i.vms.length > 0)
 
   const tabs: { id: Tab; label: string; items: InitiativeCache[] }[] = [
     { id: 'active', label: 'Active', items: activeInis },
@@ -605,7 +610,26 @@ export default function RoadmapPage() {
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-xl font-bold text-gray-900">Roadmap</h1>
+        <div className="flex items-center gap-4">
+          <h1 className="text-xl font-bold text-gray-900">Portfolio</h1>
+          {(() => {
+            const today = new Date(); today.setHours(0, 0, 0, 0)
+            const next = RELEASES.filter((r) => r.date >= today).sort((a, b) => a.date.getTime() - b.date.getTime())[0]
+            if (!next) return null
+            const days = Math.round((next.date.getTime() - today.getTime()) / 86400000)
+            return (
+              <div className="flex items-center gap-1.5 bg-amber-50 border border-amber-200 rounded-lg px-3 py-1"
+                title={`${next.name} on ${next.date.toLocaleDateString()}`}>
+                <div className="w-2 h-2 rounded-full bg-amber-400 shrink-0" />
+                <span className="text-xs font-medium text-amber-700">{next.name}</span>
+                <span className="text-xs text-amber-500">·</span>
+                <span className="text-xs font-semibold text-amber-700">
+                  {days === 0 ? 'Today!' : days === 1 ? '1 day' : `${days} days`}
+                </span>
+              </div>
+            )
+          })()}
+        </div>
         <div className="flex items-center gap-2">
           {syncedAt && <span className="text-xs text-gray-400">Last synced {new Date(syncedAt).toLocaleString()}</span>}
           <button

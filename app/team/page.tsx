@@ -49,6 +49,7 @@ export default function TeamPage() {
   const [editName, setEditName] = useState('')
   const [editCountry, setEditCountry] = useState('PT')
   const [editEmpNum, setEditEmpNum] = useState('')
+  const [editSlackUserId, setEditSlackUserId] = useState('')
   const [newName, setNewName] = useState('')
   const [newCountry, setNewCountry] = useState('PT')
   const [newEmpNum, setNewEmpNum] = useState('')
@@ -100,6 +101,7 @@ export default function TeamPage() {
       // Only update name/country for manual members (no eom_id)
       ...(m.eom_id ? {} : { name: editName, country: editCountry }),
       employee_number: editEmpNum ? parseInt(editEmpNum) : undefined,
+      slack_user_id: editSlackUserId.trim() || undefined,
     }
     await saveMembers(members)
     setEditIdx(null)
@@ -136,6 +138,7 @@ export default function TeamPage() {
     setEditName(m.name)
     setEditCountry(m.country ?? 'PT')
     setEditEmpNum(m.employee_number != null ? String(m.employee_number) : '')
+    setEditSlackUserId(m.slack_user_id ?? '')
   }
 
   const selectCls = 'border border-gray-300 rounded px-2 py-1 text-sm bg-white'
@@ -182,6 +185,7 @@ export default function TeamPage() {
               <th className="text-left px-4 py-3 font-medium text-gray-600">Name</th>
               <th className="text-left px-4 py-3 font-medium text-gray-600">Emp #</th>
               <th className="text-left px-4 py-3 font-medium text-gray-600">Country</th>
+              <th className="text-left px-4 py-3 font-medium text-gray-600">Slack ID</th>
               <th className="px-4 py-3" />
             </tr>
           </thead>
@@ -214,6 +218,11 @@ export default function TeamPage() {
                           {COUNTRIES.map((c) => <option key={c.code} value={c.code}>{c.label}</option>)}
                         </select>
                       : <span className="text-gray-700">{countryLabel(m.country)}</span>}
+                  </td>
+                  <td className="px-4 py-3">
+                    {editIdx === idx
+                      ? <input className={`${cellInputCls} w-32`} placeholder="U0123456789" value={editSlackUserId} onChange={(e) => setEditSlackUserId(e.target.value)} />
+                      : <span className="text-gray-500 text-xs font-mono">{m.slack_user_id ?? <span className="text-gray-300">—</span>}</span>}
                   </td>
                   <td className="px-4 py-3 text-right">
                     <div className="flex gap-2 justify-end">

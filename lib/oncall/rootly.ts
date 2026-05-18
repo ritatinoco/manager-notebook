@@ -4,6 +4,8 @@ export interface RootlyShift {
     schedule_id: string
     starts_at: string
     ends_at: string
+    is_override: boolean
+    is_shadow: boolean
   }
   relationships: {
     user: {
@@ -47,7 +49,7 @@ async function fetchShifts(
   scheduleId: string,
   from: string,
   to: string
-): Promise<RootlyResponse> {
+): Promise<Omit<RootlyResponse, 'overrides'>> {
   const url = new URL(`https://api.rootly.com/v1/schedules/${scheduleId}/shifts`)
   url.searchParams.set('include', 'user')
   url.searchParams.set('from', from)

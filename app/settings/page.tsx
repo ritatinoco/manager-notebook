@@ -35,7 +35,7 @@ function IntegrationsPanel({ children }: { children: React.ReactNode }) {
         Integrations
       </button>
       {open && (
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
           {children}
         </div>
       )}
@@ -90,6 +90,10 @@ export default function SettingsPage() {
   const [hasEomToken, setHasEomToken] = useState(false)
   const [eomTokenStatus, setEomTokenStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
 
+  const [slackFields, setSlackFields] = useState({ SLACK_BOT_TOKEN: '', slack_support_channel: '' })
+  const [hasSlackToken, setHasSlackToken] = useState(false)
+  const [slackSaveStatus, setSlackSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
+
   const [snowflakeFields, setSnowflakeFields] = useState({
     SNOWFLAKE_ACCOUNT: '',
     SNOWFLAKE_USER: '',
@@ -119,6 +123,8 @@ export default function SettingsPage() {
       setValueStream(d.oncall_department ?? '')
       setRootlyFields({ ROOTLY_TOKEN: d.ROOTLY_TOKEN ?? '', oncall_schedule_id: d.oncall_schedule_id ?? '' })
       setHasRootlyToken(d.hasRootlyToken)
+      setSlackFields({ SLACK_BOT_TOKEN: d.SLACK_BOT_TOKEN ?? '', slack_support_channel: d.slack_support_channel ?? '' })
+      setHasSlackToken(d.hasSlackToken ?? false)
     })
     fetch('/api/active-team').then((r) => r.json()).then((d) => {
       setActiveTeamId(d.activeTeamId)
@@ -288,6 +294,25 @@ export default function SettingsPage() {
     if (res.ok) setSfConnections(await res.json())
   }
 
+  async function saveSlack() {
+    setSlackSaveStatus('saving')
+    const res = await fetch('/api/setup/env', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(slackFields),
+    })
+    if (res.ok) {
+      if (slackFields.SLACK_BOT_TOKEN && slackFields.SLACK_BOT_TOKEN !== '••••••••') {
+        setHasSlackToken(true)
+        setSlackFields((f) => ({ ...f, SLACK_BOT_TOKEN: '' }))
+      }
+      setSlackSaveStatus('saved')
+      setTimeout(() => setSlackSaveStatus('idle'), 2500)
+    } else {
+      setSlackSaveStatus('error')
+    }
+  }
+
   async function saveEomToken() {
     if (!eomToken.trim() || eomTokenStatus === 'saving') return
     setEomTokenStatus('saving')
@@ -327,7 +352,7 @@ export default function SettingsPage() {
   const syncBusy = syncAllStatus === 'syncing' || jiraSync === 'syncing' || eomSync === 'syncing'
 
   return (
-    <div className="max-w-4xl space-y-4">
+    <div className="space-y-4">
       <h1 className="text-xl font-bold text-gray-900">Settings</h1>
 
       {/* ── Sync All Sources ──────────────────────────────────────────────── */}
@@ -550,6 +575,50 @@ export default function SettingsPage() {
           )}
         </div>
 
+        {/* Slack */}
+        <div className="bg-white border border-gray-200 rounded-xl p-4">
+          <div className="flex items-center gap-2 mb-1">
+            <svg width="18" height="18" viewBox="0 0 127 127" fill="none">
+              <path d="M27.2 80a13.6 13.6 0 1 1-13.6-13.6H27.2V80z" fill="#E01E5A"/>
+              <path d="M33.9 80a13.6 13.6 0 0 1 27.2 0v34a13.6 13.6 0 0 1-27.2 0V80z" fill="#E01E5A"/>
+              <path d="M47.5 27.2a13.6 13.6 0 1 1 13.6-13.6V27.2H47.5z" fill="#36C5F0"/>
+              <path d="M47.5 33.9a13.6 13.6 0 0 1 0 27.2H13.6a13.6 13.6 0 0 1 0-27.2H47.5z" fill="#36C5F0"/>
+              <path d="M100.3 47.5a13.6 13.6 0 1 1 13.6 13.6H100.3V47.5z" fill="#2EB67D"/>
+              <path d="M93.6 47.5a13.6 13.6 0 0 1-27.2 0v-34a13.6 13.6 0 0 1 27.2 0v34z" fill="#2EB67D"/>
+              <path d="M80 100.3a13.6 13.6 0 1 1-13.6 13.6V100.3H80z" fill="#ECB22E"/>
+              <path d="M80 93.6a13.6 13.6 0 0 1 0-27.2h33.9a13.6 13.6 0 0 1 0 27.2H80z" fill="#ECB22E"/>
+            </svg>
+            <h3 className="text-sm font-semibold text-gray-700">Slack</h3>
+          </div>
+          <p className="text-xs text-gray-400 mb-4">
+            Required for sending support updates. Token stored in <code className="bg-gray-100 px-1 rounded">.env.local</code>, never committed.
+          </p>
+          <div className="space-y-3">
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Bot Token</label>
+              <input className={inputCls} type="password"
+                placeholder={hasSlackToken ? 'Token saved — paste to replace' : 'xoxb-...'}
+                value={slackFields.SLACK_BOT_TOKEN}
+                onChange={(e) => { setSlackFields((f) => ({ ...f, SLACK_BOT_TOKEN: e.target.value })); setHasSlackToken(false); setSlackSaveStatus('idle') }} />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Channel ID</label>
+              <input className={inputCls}
+                placeholder="C0123456789"
+                value={slackFields.slack_support_channel}
+                onChange={(e) => { setSlackFields((f) => ({ ...f, slack_support_channel: e.target.value })); setSlackSaveStatus('idle') }} />
+              <p className="text-xs text-gray-400 mt-1">Right-click the channel in Slack → Copy link → the ID is at the end.</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 mt-4">
+            <Button size="sm" onClick={saveSlack} disabled={slackSaveStatus === 'saving'}>
+              {slackSaveStatus === 'saving' ? 'Saving…' : 'Save'}
+            </Button>
+            {slackSaveStatus === 'saved' && <span className="text-xs text-green-600">✓ Saved</span>}
+            {slackSaveStatus === 'error' && <span className="text-xs text-red-600">Failed</span>}
+          </div>
+        </div>
+
         {/* Snowflake */}
         <div className="bg-white border border-gray-200 rounded-xl p-4">
           <div className="flex items-center gap-2 mb-1">
@@ -585,68 +654,10 @@ export default function SettingsPage() {
           </div>
         </div>
 
-        {/* Snowflake Connections */}
-        <div className="bg-white border border-gray-200 rounded-xl p-4 col-span-2">
-          <div className="flex items-center justify-between mb-3">
-            <div>
-              <h3 className="text-sm font-semibold text-gray-700">Snowflake Connections</h3>
-              <p className="text-xs text-gray-400 mt-0.5">Named database + warehouse profiles you can pick when querying.</p>
-            </div>
-            {!sfConnForm && (
-              <button
-                onClick={() => { setSfConnForm({ name: '', database: '', warehouse: '', schema: '' }); setSfConnEditId(null) }}
-                className="text-xs text-indigo-600 border border-indigo-200 rounded-lg px-2.5 py-1 hover:bg-indigo-50"
-              >
-                + Add
-              </button>
-            )}
-          </div>
-
-          {sfConnections.length > 0 && (
-            <div className="space-y-2 mb-3">
-              {sfConnections.map((c) => (
-                <div key={c.id} className="flex items-center justify-between rounded-lg border border-gray-100 px-3 py-2 text-sm">
-                  <div>
-                    <span className="font-medium text-gray-700">{c.name}</span>
-                    <span className="text-gray-400 ml-2 text-xs">{c.database}{c.warehouse ? ` · ${c.warehouse}` : ''}{c.schema ? ` · ${c.schema}` : ''}</span>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <button onClick={() => { setSfConnEditId(c.id); setSfConnForm({ name: c.name, database: c.database, warehouse: c.warehouse, schema: c.schema }) }}
-                      className="text-xs text-gray-400 hover:text-gray-700">Edit</button>
-                    <button onClick={() => deleteSfConnection(c.id)} className="text-xs text-red-400 hover:text-red-600">Delete</button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {sfConnForm && (
-            <div className="border border-gray-200 rounded-lg p-3 space-y-2">
-              <input className={inputCls} placeholder="Connection name (e.g. Engineering Metrics)" value={sfConnForm.name}
-                onChange={(e) => setSfConnForm((f) => f && ({ ...f, name: e.target.value }))} />
-              <div className="grid grid-cols-2 gap-2">
-                <input className={inputCls} placeholder="Database" value={sfConnForm.database}
-                  onChange={(e) => setSfConnForm((f) => f && ({ ...f, database: e.target.value }))} />
-                <input className={inputCls} placeholder="Warehouse" value={sfConnForm.warehouse}
-                  onChange={(e) => setSfConnForm((f) => f && ({ ...f, warehouse: e.target.value }))} />
-              </div>
-              <input className={inputCls} placeholder="Schema (optional)" value={sfConnForm.schema}
-                onChange={(e) => setSfConnForm((f) => f && ({ ...f, schema: e.target.value }))} />
-              <div className="flex items-center gap-2 pt-1">
-                <Button size="sm" onClick={saveSfConnection} disabled={!sfConnForm.name.trim()}>Save</Button>
-                <button onClick={() => { setSfConnForm(null); setSfConnEditId(null) }} className="text-xs text-gray-500 hover:text-gray-700">Cancel</button>
-              </div>
-            </div>
-          )}
-
-          {sfConnections.length === 0 && !sfConnForm && (
-            <p className="text-xs text-gray-400">No connections yet.</p>
-          )}
-        </div>
       </IntegrationsPanel>
 
       {/* ── Danger Zone ───────────────────────────────────────────────────────── */}
-      <div className="border border-red-200 rounded-xl p-5 max-w-lg">
+      <div className="border border-red-200 rounded-xl p-5">
         <h2 className="text-sm font-semibold text-red-700 mb-1">Danger Zone</h2>
         <p className="text-xs text-gray-400 mb-4">Permanently delete this team and all its data. This cannot be undone.</p>
         {!deleteConfirm ? (

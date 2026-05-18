@@ -60,38 +60,49 @@ export async function GET(req: NextRequest) {
       if (u.type === 'users') userIdToName.set(u.id, u.attributes.name)
     }
 
-    // Count days on-call per member
+    // Build a day → effective member name map.
+    // Override shifts (is_override: true) take precedence over regular ones.
+    const dayOwner: Record<string, string> = {}
+
+    // Process regular shifts first, then overrides (so overrides win)
+    const regular = data.data.filter((s) => !s.attributes.is_override && !s.attributes.is_shadow)
+    const overrides = data.data.filter((s) => s.attributes.is_override && !s.attributes.is_shadow)
+
+    for (const batch of [regular, overrides]) {
+      for (const shift of batch) {
+        const userName = userIdToName.get(shift.relationships.user.data.id)
+        if (!userName) continue
+        const member = config.team_members.find((m) => m.name === userName)
+        if (!member) continue
+
+        const startStr = new Date(shift.attributes.starts_at).toISOString().slice(0, 10)
+        const endStr = new Date(shift.attributes.ends_at).toISOString().slice(0, 10)
+        if (startStr === endStr) continue
+
+        let cursor = startStr
+        while (cursor < endStr) {
+          if (cursor >= monthStartStr && cursor <= monthEndStr) {
+            dayOwner[cursor] = member.name
+          }
+          const d = new Date(cursor + 'T12:00:00Z')
+          d.setUTCDate(d.getUTCDate() + 1)
+          cursor = d.toISOString().slice(0, 10)
+        }
+      }
+    }
+
+    // Count weekdays/weekends per member from the resolved day map
     const memberDays: Record<string, { weekdays: number; weekends: number }> = {}
 
-    for (const shift of data.data) {
-      const userName = userIdToName.get(shift.relationships.user.data.id)
-      if (!userName) continue
-
-      const member = config.team_members.find((m) => m.name === userName)
+    for (const [day, name] of Object.entries(dayOwner)) {
+      const member = config.team_members.find((m) => m.name === name)
       if (!member) continue
-
-      const startStr = new Date(shift.attributes.starts_at).toISOString().slice(0, 10)
-      const endStr = new Date(shift.attributes.ends_at).toISOString().slice(0, 10)
-
-      // Skip zero-duration shifts
-      if (startStr === endStr) continue
-
-      if (!memberDays[member.name]) memberDays[member.name] = { weekdays: 0, weekends: 0 }
-
+      if (!memberDays[name]) memberDays[name] = { weekdays: 0, weekends: 0 }
       const country = member.country ?? 'PT'
-      let cursor = startStr
-      while (cursor < endStr) {
-        if (cursor >= monthStartStr && cursor <= monthEndStr) {
-          if (isBusinessDay(cursor, country)) {
-            memberDays[member.name].weekdays++
-          } else {
-            memberDays[member.name].weekends++
-          }
-        }
-        // advance cursor by one day
-        const d = new Date(cursor + 'T12:00:00Z')
-        d.setUTCDate(d.getUTCDate() + 1)
-        cursor = d.toISOString().slice(0, 10)
+      if (isBusinessDay(day, country)) {
+        memberDays[name].weekdays++
+      } else {
+        memberDays[name].weekends++
       }
     }
 
