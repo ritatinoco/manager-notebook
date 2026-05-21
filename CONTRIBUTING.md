@@ -23,6 +23,17 @@ Create `.env.local` at the repo root:
 JIRA_BASE_URL=https://your-org.atlassian.net
 JIRA_EMAIL=your@email.com
 JIRA_API_TOKEN=your_api_token
+
+# Optional — enables on-call page
+ROOTLY_API_KEY=your_rootly_key
+
+# Optional — enables Slack send on Support page
+SLACK_BOT_TOKEN=xoxb-your-bot-token
+
+# Optional — enables Features and Query pages
+SNOWFLAKE_ACCOUNT=xy12345.us-east-1
+SNOWFLAKE_USER=your.email@company.com
+SNOWFLAKE_TOKEN=your_programmatic_access_token
 ```
 
 Copy the example config and edit it to match your team:

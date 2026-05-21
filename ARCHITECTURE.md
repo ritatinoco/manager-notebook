@@ -1,7 +1,7 @@
 # Capacity Planner Architecture
 
 > **Repository:** manager-notebook
-> **Last Updated:** 2026-05-07
+> **Last Updated:** 2026-05-18
 
 ## Overview
 
@@ -20,11 +20,13 @@ graph TB
     Jira["Jira Cloud REST API<br/>EXTERNAL"]
     Rootly["Rootly On-Call API<br/>api.rootly.com<br/>EXTERNAL"]
     Snowflake["Snowflake<br/>*.snowflakecomputing.com<br/>EXTERNAL"]
+    Slack["Slack API<br/>slack.com/api<br/>EXTERNAL"]
     FS[("Local Filesystem<br/>data/teams/{id}/*.json<br/>EXTERNAL")]
 
     App -->|"HTTP Basic Auth<br/>Sync endpoints only"| Jira
     App -->|"Bearer token<br/>Sync endpoints only"| Rootly
     App -->|"PAT (snowflake-sdk)<br/>On demand per query"| Snowflake
+    App -->|"Bot token<br/>On demand (send message)"| Slack
     App -->|"Read / write JSON files<br/>All endpoints"| FS
 
     classDef thisRepo fill:#e0f2f1,stroke:#00796b,stroke-width:3px
@@ -32,7 +34,7 @@ graph TB
     classDef database fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
 
     class App thisRepo
-    class Jira,Rootly,Snowflake external
+    class Jira,Rootly,Snowflake,Slack external
     class FS database
 ```
 
@@ -45,6 +47,7 @@ graph TB
 | Jira Cloud REST API | Basic Auth (email + API token) | Sprint velocity, story points, roadmap, sprint goals |
 | Rootly On-Call API (`api.rootly.com`) | Bearer token | On-call shifts and schedules |
 | Snowflake (`*.snowflakecomputing.com`) | Programmatic Access Token via `snowflake-sdk` | Live feature analytics queries |
+| Slack API (`slack.com/api`) | Bot token (`SLACK_BOT_TOKEN`) | Send support standup messages to a channel |
 | Local filesystem (`data/`) | — | Persist and read cached data between syncs |
 
 ---
@@ -58,6 +61,8 @@ Syncs are triggered manually from the UI (Sync button on the dashboard or veloci
 3. `GET /api/oncall` — fetches Rootly shifts, writes on-call cache
 
 After each sync, all UI reads are served from the local JSON cache with no further external calls.
+
+**Non-sync external calls:** `POST /api/slack/send` posts a message to a Slack channel on demand (Support page). `GET /api/support-tickets` calls Jira live (no cache) to fetch the current open ticket list.
 
 ---
 
@@ -90,7 +95,7 @@ Direct HTTP calls to external APIs must not appear in API route handlers or busi
 
 ### T4. The filesystem is the only persistence layer
 
-No database, cache server, or remote store. All mutable state — team config, cached Jira data, absences, on-call cache, sprint comments — is stored as JSON files under `data/teams/{id}/`. Data access is mediated through thin read/write helpers in `lib/data/`.
+No database, cache server, or remote store. All mutable state is stored as JSON files under `data/`. Team-scoped data lives under `data/teams/{id}/`; global data (Snowflake feature configs, connection profiles) lives directly under `data/`. Data access is mediated through thin read/write helpers in `lib/data/` or inline `fs` reads in the relevant API routes.
 
 **Evidence:**
 - [`lib/data/config.ts`](lib/data/config.ts) (`getConfig`, `saveConfig`) — reads and writes `data/teams/{id}/config.json` via `fs`
@@ -128,6 +133,8 @@ app/                  Pages and API routes (Next.js App Router)
   vm-timeline/        Timeline view of value milestones
   gantt/              Gantt chart view
   oncall/             On-call schedule
+  notes/              Freeform notes and action items
+  support/            Active support tickets with Slack send
   snowflake/
     features/         Feature analytics (saved feature configs + charts)
     query/            Ad-hoc Snowflake query runner
@@ -151,6 +158,7 @@ lib/
     teams.ts          Multi-team management
     value-streams.ts  Value stream filter state
     oncall-cache.ts   Cached on-call rotation data
+    notes.ts          Notes and action items per team
   jira/
     client.ts         Jira HTTP client (jiraFetch, jiraPost, jiraPut)
     sprints.ts        Board discovery and sprint listing
@@ -172,6 +180,7 @@ data/                 Runtime data (gitignored except config.example.json)
     absences.json     Absences
     jira-cache.json   Jira sprint cache
     sprint-comments.json  Manager sprint notes
+    notes.json            Freeform notes and action items
 ```
 
 ---

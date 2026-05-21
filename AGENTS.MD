@@ -37,6 +37,7 @@ manager-notebook/
 │   ├── capacity/                # Capacity math (pure, no I/O)
 │   ├── jira/                    # Jira client, sprint sync, velocity, roadmap
 │   ├── oncall/                  # Rootly on-call client
+│   ├── snowflake/               # Snowflake connection and query runner
 │   ├── holidays.ts              # Portuguese and US public holiday computation
 │   └── data/                   # Read/write helpers for all JSON data files
 ├── components/                  # React components
@@ -64,6 +65,8 @@ manager-notebook/
 | `lib/holidays.ts` | Portuguese and US public holiday computation |
 | `lib/data/teams.ts` | Multi-team management and `teamDataDir` path resolution |
 | `lib/data/config.ts` | Team config read/write (`getConfig`, `saveConfig`) |
+| `lib/data/notes.ts` | Notes and action items read/write |
+| `lib/snowflake/client.ts` | Snowflake connection setup and `runQuery` |
 | `data/config.example.json` | Team config schema reference |
 
 ---
@@ -78,6 +81,7 @@ All runtime data is stored under `data/teams/{id}/` (gitignored). Files are read
 | `data/teams/{id}/absences.json` | Days off per member per sprint |
 | `data/teams/{id}/jira-cache.json` | Cached sprint data from Jira |
 | `data/teams/{id}/sprint-comments.json` | Manager notes per sprint |
+| `data/teams/{id}/notes.json` | Freeform notes and action items |
 | `data/teams.json` | List of all teams |
 | `data/active-team.json` | Currently active team ID |
 
@@ -98,4 +102,4 @@ All runtime data is stored under `data/teams/{id}/` (gitignored). Files are read
 
 ---
 
-*Last updated: 2026-05-06*
+*Last updated: 2026-05-20*

@@ -1,6 +1,6 @@
 # Capacity Planner
 
-A sprint capacity planning tool for engineering managers. Pulls data directly from Jira and Rootly, then computes team capacity, allocation targets, velocity trends, and the recurring artefacts a manager needs — replacing manual spreadsheets.
+A sprint capacity planning tool for engineering managers. Pulls data from Jira and Rootly, computes team capacity, allocation targets, and velocity trends — and connects to Snowflake to track feature adoption metrics and run ad-hoc analytics queries. Replaces manual spreadsheets and context-switching between tools.
 
 Built with Next.js, TypeScript, and Tailwind CSS.
 
@@ -25,6 +25,8 @@ The app is organised around the engineering manager's recurring rhythm. Each sec
 | [On-Call](#on-call----oncall) | On-call shifts from Rootly |
 | [Team](#team----team) | Team member config and SP/day rates |
 | [Allocation](#allocation----allocation) | Tune the % split between work categories |
+| [Notes](#notes----notes) | Persistent freeform notes and action items |
+| [Support](#support----support) | Active support tickets with Slack send |
 | [Features](#features----snowflakefeatures) | Track feature adoption metrics from Snowflake |
 | [Query](#query----snowflakequery) | Run ad-hoc SQL queries against Snowflake |
 | [Settings](#settings----settings) | Configure integrations and run syncs |
@@ -39,17 +41,30 @@ The app is organised around the engineering manager's recurring rhythm. Each sec
 npm install
 ```
 
-### 2. Configure Jira
+### 2. Configure integrations
 
 Create `.env.local` in the repo root:
 
 ```env
+# Jira (required)
 JIRA_BASE_URL=https://your-org.atlassian.net
 JIRA_EMAIL=your@email.com
 JIRA_API_TOKEN=your_api_token
+
+# Rootly (optional — enables on-call page)
+ROOTLY_API_KEY=your_rootly_key
+
+# Slack (optional — enables send-to-channel on Support page)
+SLACK_BOT_TOKEN=xoxb-your-bot-token
+
+# Snowflake (optional — enables Features and Query pages)
+SNOWFLAKE_ACCOUNT=xy12345.us-east-1
+SNOWFLAKE_USER=your.email@company.com
+SNOWFLAKE_TOKEN=your_programmatic_access_token
 ```
 
-Generate a Jira API token at https://id.atlassian.com/manage-profile/security/api-tokens.
+- Jira API token: https://id.atlassian.com/manage-profile/security/api-tokens
+- Snowflake PAT: Snowflake UI → your avatar → Profile → Authentication → Programmatic access tokens → Generate token
 
 ### 3. Run the app
 
@@ -164,6 +179,26 @@ Set `ROOTLY_API_KEY` in `.env.local` and configure the schedule ID in Settings t
 - Re-balance allocation at the start of a new quarter.
 - Temporarily shift more % into debts during a stabilisation push and see suggested SP update everywhere.
 
+### Notes — `/notes`
+
+**Purpose.** A persistent scratchpad for freeform text blocks and action item checklists.
+
+**Use cases.**
+- Capture meeting notes, retro takeaways, or planning thoughts without leaving the app.
+- Track action items with checkboxes — mark them done as you work through them.
+- Notes auto-save and persist across sessions in `data/teams/{id}/notes.json`.
+
+### Support — `/support`
+
+**Purpose.** Live view of active support tickets assigned to the team, with a Slack send action.
+
+**Use cases.**
+- See all open support tickets (from Jira) in one place, with status and priority badges.
+- Draft a Slack standup message summarising the ticket list and send it to the configured channel.
+- Each team member's Slack user ID (set in Team settings) links them to their ticket for easy @-mention in the message.
+
+Set `SLACK_BOT_TOKEN` in `.env.local` and configure `slack_support_channel` in Settings to enable sending.
+
 ### Features — `/snowflake/features`
 
 **Purpose.** Track adoption and usage metrics for specific product features, powered by Snowflake queries.
@@ -241,6 +276,7 @@ Computed from closed sprints in the selected quarter only. Active and future spr
 | `data/teams/{id}/absences.json` | Days off per member per sprint |
 | `data/teams/{id}/jira-cache.json` | Cached sprint data from Jira |
 | `data/teams/{id}/sprint-comments.json` | Manager notes per sprint |
+| `data/teams/{id}/notes.json` | Freeform notes and action items |
 | `data/teams.json` | List of all teams |
 | `data/active-team.json` | Currently active team ID |
 | `data/snowflake-features.json` | Saved feature configs (name, description, SQL charts) |
