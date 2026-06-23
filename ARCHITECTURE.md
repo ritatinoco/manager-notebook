@@ -21,7 +21,7 @@ graph TB
     Rootly["Rootly On-Call API<br/>api.rootly.com<br/>EXTERNAL"]
     Snowflake["Snowflake<br/>*.snowflakecomputing.com<br/>EXTERNAL"]
     Slack["Slack API<br/>slack.com/api<br/>EXTERNAL"]
-    EOM["EOM API<br/>apps.outsystems.app/EOM<br/>EXTERNAL"]
+    EOM["EOM API<br/>EOM<br/>EXTERNAL"]
     FS[("Local Filesystem<br/>data/teams/{id}/*.json<br/>EXTERNAL")]
 
     App -->|"HTTP Basic Auth<br/>Sync endpoints only"| Jira
@@ -50,7 +50,7 @@ graph TB
 | Rootly On-Call API (`api.rootly.com`) | Bearer token | On-call shifts and schedules |
 | Snowflake (`*.snowflakecomputing.com`) | Programmatic Access Token via `snowflake-sdk` | Live feature analytics queries |
 | Slack API (`slack.com/api`) | Bot token (`SLACK_BOT_TOKEN`) | Send support standup messages to a channel |
-| EOM API (`apps.outsystems.app/EOM/rest/v1`) | Bearer token (`EOM_TOKEN`) | Sync direct reports (name, email, country, avatar) to Team config |
+| EOM API (`/EOM/rest/v1`) | Bearer token (`EOM_TOKEN`) | Sync direct reports (name, email, country, avatar) to Team config |
 | Local filesystem (`data/`) | — | Persist and read cached data between syncs |
 
 ---

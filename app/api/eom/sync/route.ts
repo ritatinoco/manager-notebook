@@ -5,6 +5,8 @@ import { getConfig, saveConfig } from '@/lib/data/config'
 import type { MemberConfig } from '@/lib/data/config'
 import { getActiveTeamId, teamDataDir } from '@/lib/data/teams'
 
+const EOM_API_BASE = process.env.EOM_API_BASE ?? ''
+
 function readEnvVar(key: string): string {
   const envPath = path.join(process.cwd(), '.env.local')
   if (!fs.existsSync(envPath)) return process.env[key] ?? ''
@@ -17,8 +19,6 @@ function readEnvVar(key: string): string {
   }
   return process.env[key] ?? ''
 }
-
-const EOM_API_BASE = 'https://apps.outsystems.app/EOM/rest/v1'
 
 function avatarsDir(): string {
   const dir = path.join(teamDataDir(getActiveTeamId()), 'avatars')

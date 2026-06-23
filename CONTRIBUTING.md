@@ -34,6 +34,10 @@ SLACK_BOT_TOKEN=xoxb-your-bot-token
 SNOWFLAKE_ACCOUNT=xy12345.us-east-1
 SNOWFLAKE_USER=your.email@company.com
 SNOWFLAKE_TOKEN=your_programmatic_access_token
+
+# Optional — enables Sync from EOM on Team page
+EOM_API_BASE=eom_api
+EOM_TOKEN=your_eom_personal_token
 ```
 
 Copy the example config and edit it to match your team:
