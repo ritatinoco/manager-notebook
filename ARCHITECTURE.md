@@ -1,7 +1,7 @@
 # Capacity Planner Architecture
 
 > **Repository:** manager-notebook
-> **Last Updated:** 2026-05-18
+> **Last Updated:** 2026-06-23
 
 ## Overview
 
@@ -21,12 +21,14 @@ graph TB
     Rootly["Rootly On-Call API<br/>api.rootly.com<br/>EXTERNAL"]
     Snowflake["Snowflake<br/>*.snowflakecomputing.com<br/>EXTERNAL"]
     Slack["Slack API<br/>slack.com/api<br/>EXTERNAL"]
+    EOM["EOM API<br/>apps.outsystems.app/EOM<br/>EXTERNAL"]
     FS[("Local Filesystem<br/>data/teams/{id}/*.json<br/>EXTERNAL")]
 
     App -->|"HTTP Basic Auth<br/>Sync endpoints only"| Jira
     App -->|"Bearer token<br/>Sync endpoints only"| Rootly
     App -->|"PAT (snowflake-sdk)<br/>On demand per query"| Snowflake
     App -->|"Bot token<br/>On demand (send message)"| Slack
+    App -->|"Bearer token<br/>On demand (team sync)"| EOM
     App -->|"Read / write JSON files<br/>All endpoints"| FS
 
     classDef thisRepo fill:#e0f2f1,stroke:#00796b,stroke-width:3px
@@ -34,7 +36,7 @@ graph TB
     classDef database fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
 
     class App thisRepo
-    class Jira,Rootly,Snowflake,Slack external
+    class Jira,Rootly,Snowflake,Slack,EOM external
     class FS database
 ```
 
@@ -48,6 +50,7 @@ graph TB
 | Rootly On-Call API (`api.rootly.com`) | Bearer token | On-call shifts and schedules |
 | Snowflake (`*.snowflakecomputing.com`) | Programmatic Access Token via `snowflake-sdk` | Live feature analytics queries |
 | Slack API (`slack.com/api`) | Bot token (`SLACK_BOT_TOKEN`) | Send support standup messages to a channel |
+| EOM API (`apps.outsystems.app/EOM/rest/v1`) | Bearer token (`EOM_TOKEN`) | Sync direct reports (name, email, country, avatar) to Team config |
 | Local filesystem (`data/`) | — | Persist and read cached data between syncs |
 
 ---
@@ -228,9 +231,11 @@ POST /api/jira/sync
   │
   ├─ getRARBoardId()        → find scrum board for jira_project_key
   ├─ getBoardSprints()      → list all sprints
+  ├─ [closed sprints]       → skip if cached.syncedAsClosed && SP data present
   ├─ getVelocityData()      → initialCommittedSP per sprint
   ├─ fetchDeliveredSP()     → JQL: status in (Done, "Waiting for Release")
   └─ saveJiraCache()        → write to data/teams/{id}/jira-cache.json
+                               (closed entries marked syncedAsClosed: true)
 ```
 
 ## Data Flow: Capacity Page

@@ -61,10 +61,14 @@ SLACK_BOT_TOKEN=xoxb-your-bot-token
 SNOWFLAKE_ACCOUNT=xy12345.us-east-1
 SNOWFLAKE_USER=your.email@company.com
 SNOWFLAKE_TOKEN=your_programmatic_access_token
+
+# EOM (optional — enables "Sync from EOM" on Team page)
+EOM_TOKEN=your_eom_personal_token
 ```
 
 - Jira API token: https://id.atlassian.com/manage-profile/security/api-tokens
 - Snowflake PAT: Snowflake UI → your avatar → Profile → Authentication → Programmatic access tokens → Generate token
+- EOM token: https://apps.outsystems.app/EOM/TokenGeneration
 
 ### 3. Run the app
 
@@ -170,6 +174,9 @@ Set `ROOTLY_API_KEY` in `.env.local` and configure the schedule ID in Settings t
 - Add, remove, or rename team members.
 - Set per-member SP/day rate and country for holiday calculations.
 - Configure Jira account IDs to link members to Jira data.
+- Click **Sync from EOM** to pull your direct reports from the EOM API — matches by email/name, preserves SP/day rate and Jira IDs, and downloads member avatars automatically.
+
+Set `EOM_TOKEN` in `.env.local` and configure **Manager Name** in Settings to enable EOM sync. For EOM-synced members, name and country are read-only; only `employee_number` is editable.
 
 ### Allocation — `/allocation`
 
@@ -232,6 +239,7 @@ Set `SLACK_BOT_TOKEN` in `.env.local` and configure `slack_support_channel` in S
 - Run individual syncs (Jira sprint data, Jira roadmap, on-call shifts).
 - See last-synced timestamp per source.
 - Configure Snowflake credentials (account, API token) and manage named connection profiles (database, warehouse, schema).
+- Enter your **EOM token** and **Manager Name** (used to filter direct reports) to enable EOM team sync.
 
 ### Multi-team
 
@@ -281,5 +289,6 @@ Computed from closed sprints in the selected quarter only. Active and future spr
 | `data/active-team.json` | Currently active team ID |
 | `data/snowflake-features.json` | Saved feature configs (name, description, SQL charts) |
 | `data/snowflake-connections.json` | Named Snowflake connection profiles |
+| `data/teams/{id}/avatars/{eom_id}.png` | Member avatar images downloaded from EOM |
 
 See `data/config.example.json` for the config schema. All data files are gitignored.

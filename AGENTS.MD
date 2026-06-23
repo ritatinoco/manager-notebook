@@ -67,6 +67,9 @@ manager-notebook/
 | `lib/data/config.ts` | Team config read/write (`getConfig`, `saveConfig`) |
 | `lib/data/notes.ts` | Notes and action items read/write |
 | `lib/snowflake/client.ts` | Snowflake connection setup and `runQuery` |
+| `app/api/eom/sync/route.ts` | EOM team sync — fetch direct reports, merge into config, download avatars |
+| `app/api/eom/env/route.ts` | Read/write `EOM_TOKEN` (returns masked value on GET) |
+| `app/api/avatars/[id]/route.ts` | Serve cached avatar PNGs from `data/teams/{id}/avatars/` |
 | `data/config.example.json` | Team config schema reference |
 
 ---
@@ -99,7 +102,8 @@ All runtime data is stored under `data/teams/{id}/` (gitignored). Files are read
 | **Delivered** | SP with status Done or Waiting for Release at sprint end |
 | **Over-commit** | Sprint where initial commitment exceeded team capacity SP |
 | **Under-deliver** | Sprint where delivered SP < initial commitment |
+| **syncedAsClosed** | Boolean flag on a cached sprint entry — set when a closed sprint was fully synced (velocity + delivered SP). The sync route skips re-fetching closed sprints that already have this flag and non-zero SP data |
 
 ---
 
-*Last updated: 2026-05-20*
+*Last updated: 2026-06-23*
