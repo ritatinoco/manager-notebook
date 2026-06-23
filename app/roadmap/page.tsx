@@ -54,18 +54,20 @@ function classifyInitiative(ini: InitiativeCache): IniGroup {
   return 'active'
 }
 
+function earliestStart(ini: InitiativeCache): string | null {
+  const vmDates = ini.vms.map((v) => v.targetStart).filter(Boolean) as string[]
+  const candidates = ini.targetStart ? [ini.targetStart, ...vmDates] : vmDates
+  return candidates.length > 0 ? candidates.sort()[0] : null
+}
+
 function sortActive(items: InitiativeCache[]): InitiativeCache[] {
   return [...items].sort((a, b) => {
-    const ai = ACTIVE_ORDER.indexOf(a.status)
-    const bi = ACTIVE_ORDER.indexOf(b.status)
-    const aDone = DONE_STATUSES.has(a.status)
-    const bDone = DONE_STATUSES.has(b.status)
-    if (aDone && !bDone) return 1
-    if (!aDone && bDone) return -1
-    if (ai !== -1 && bi !== -1) return ai - bi
-    if (ai !== -1) return -1
-    if (bi !== -1) return 1
-    return a.status.localeCompare(b.status)
+    const da = earliestStart(a)
+    const db = earliestStart(b)
+    if (!da && !db) return 0
+    if (!da) return 1
+    if (!db) return -1
+    return da.localeCompare(db)
   })
 }
 
@@ -594,8 +596,26 @@ export default function RoadmapPage() {
     })
     .filter(Boolean) as InitiativeCache[]
 
+  function isDefinition(status: string) {
+    return DEFINITION_KEYWORDS.some((k) => status.toLowerCase().includes(k))
+  }
+
   const nonDoneInis = allInitiatives.map(withoutDone)
-  const activeInis = sortActive(nonDoneInis.filter((i) => classifyInitiative(i) === 'active' && i.vms.length > 0))
+  function isPaused(status: string) {
+    return PAUSED_KEYWORDS.some((k) => status.toLowerCase().includes(k))
+  }
+
+  const activeInis = sortActive(
+    nonDoneInis
+      .filter((i) => classifyInitiative(i) === 'active')
+      .map((i) => ({
+        ...i,
+        vms: i.vms
+          .filter((vm) => !isDefinition(vm.status))
+          .map((vm) => ({ ...vm, epics: vm.epics.filter((e) => !isPaused(e.status)) })),
+      }))
+      .filter((i) => i.vms.length > 0)
+  )
   const definitionInis = nonDoneInis.filter((i) => classifyInitiative(i) === 'definition' && i.vms.length > 0)
   const pausedInis = nonDoneInis.filter((i) => classifyInitiative(i) === 'paused' && i.vms.length > 0)
 

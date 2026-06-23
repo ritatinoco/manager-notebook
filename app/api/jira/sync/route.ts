@@ -39,8 +39,8 @@ export async function POST() {
 
       // Reuse cached data for closed sprints that already have SP data + the newer doneSP split
       const cached = existingById.get(js.id)
-      if (js.state === 'closed' && cached && (cached.committedSP > 0 || cached.deliveredSP > 0) && cached.doneSP !== undefined) {
-        syncedSprints.push({ ...cached, state: js.state })
+      if (js.state === 'closed' && cached?.syncedAsClosed && (cached.committedSP > 0 || cached.deliveredSP > 0)) {
+        syncedSprints.push(cached)
         continue
       }
 
@@ -74,6 +74,7 @@ export async function POST() {
         doneSP,
         waitingForReleaseSP,
         workloadByName,
+        ...(js.state === 'closed' && { syncedAsClosed: true }),
       })
     }
 

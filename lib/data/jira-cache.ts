@@ -20,6 +20,7 @@ export interface SprintCache {
   waitingForReleaseSP?: number
   workloadByName: Record<string, number>
   bootstrapped?: boolean
+  syncedAsClosed?: boolean
 }
 
 export interface JiraCache {
